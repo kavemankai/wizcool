@@ -1,34 +1,31 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=8 format=3]
 
-[ext_resource type="Script" path="res://scripts/game/ArenaController.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/game/EnemyAI.gd" id="2"]
-[ext_resource type="PackedScene" path="res://scenes/Barrier.tscn" id="3"]
-[ext_resource type="PackedScene" path="res://scenes/Projectile.tscn" id="4"]
-[ext_resource type="PackedScene" path="res://scenes/HUD.tscn" id="5"]
+[ext_resource type="Script" path="res://scripts/game/ArenaController.gd" id="e1"]
+[ext_resource type="Script" path="res://scripts/game/EnemyAI.gd" id="e2"]
+[ext_resource type="PackedScene" path="res://scenes/Barrier.tscn" id="e3"]
+[ext_resource type="PackedScene" path="res://scenes/Projectile.tscn" id="e4"]
+[ext_resource type="PackedScene" path="res://scenes/HUD.tscn" id="e5"]
 
-[sub_resource type="RectangleShape2D" id="1"]
+[sub_resource type="RectangleShape2D" id="s1"]
 size = Vector2(1280, 20)
 
-[sub_resource type="RectangleShape2D" id="2"]
+[sub_resource type="RectangleShape2D" id="s2"]
 size = Vector2(1280, 20)
-
-[sub_resource type="RectangleShape2D" id="3"]
-size = Vector2(20, 720)
 
 [node name="Arena" type="Node2D"]
-script = ExtResource("1")
+script = ExtResource("e1")
 
 [node name="TopWall" type="StaticBody2D" parent="."]
 position = Vector2(640, 10)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="TopWall"]
-shape = SubResource("1")
+shape = SubResource("s1")
 
 [node name="BottomWall" type="StaticBody2D" parent="."]
 position = Vector2(640, 710)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="BottomWall"]
-shape = SubResource("2")
+shape = SubResource("s2")
 
 [node name="PlayerWizard" type="Polygon2D" parent="."]
 position = Vector2(18, 360)
@@ -41,16 +38,14 @@ polygon = PackedVector2Array(-8, -60, 8, -60, 8, 60, -8, 60)
 color = Color(1, 0.3, 0.3, 0.6)
 
 [node name="EnemyAI" type="Node" parent="."]
-script = ExtResource("2")
+script = ExtResource("e2")
 
-[node name="PlayerBarrier" parent="." instance=ExtResource("3")]
+[node name="PlayerBarrier" parent="." instance=ExtResource("e3")]
 position = Vector2(50, 360)
-is_player = true
 
-[node name="EnemyBarrier" parent="." instance=ExtResource("3")]
+[node name="EnemyBarrier" parent="." instance=ExtResource("e3")]
 position = Vector2(1230, 360)
-is_player = false
 
-[node name="Projectile" parent="." instance=ExtResource("4")]
+[node name="Projectile" parent="." instance=ExtResource("e4")]
 
-[node name="HUD" parent="." instance=ExtResource("5")]
+[node name="HUD" parent="." instance=ExtResource("e5")]
