@@ -1,116 +1,115 @@
-# WIZARD DUEL — Claude Code Reference
+# FRINGE LEDGER — Claude Code Reference
 
 ## What this is
 
-Roguelite wizard battle game. Balatro meets Pong. Horizontal arena. Player controls barrier with W/S. Projectile bounces between barriers. Miss = damage. Win = pick upgrade. Survive 10 duels + boss.
+Tactical gear-focused sRPG. Industrial hard sci-fi / cassette-futurism aesthetic. Locked orthographic grid. Characters never level up — only gear progresses. Gear has physical state: Intact → Fractured → Broken.
 
-## Engine
+**Genre:** Tactical sRPG  
+**Engine:** Godot 4.x, GDScript  
+**Viewport:** 1280×720, locked orthographic
 
-- Godot 4.x, GDScript
-- No external game engine or framework assumptions
-- BulletUpHell: evaluated Phase 1 Day 1 — keep or drop based on fit
+## Core Loop
+
+```
+[SALVAGE MANIFEST] → [TACTICAL SKIRMISH] → [FRACTURED GEAR RESOLUTION] → [TERMINAL HUB]
+```
 
 ## Project Structure
 
 ```
 res://
   scenes/
-    Arena.tscn          # Main game scene
-    Barrier.tscn        # Reusable barrier node
-    Projectile.tscn     # Reusable projectile node
-    UpgradeDraft.tscn   # Post-victory upgrade picker (Phase 3)
-    HUD.tscn            # HP bars, duel counter
-    VictoryScreen.tscn  # (Phase 2)
-    DefeatScreen.tscn   # (Phase 2)
-    MainMenu.tscn       # (Phase 2)
+    Main.tscn           # Phase 1: Grid shell, unit, camera
   scripts/
-    game/
-      ArenaController.gd    # Game loop, state, input routing
-      BarrierController.gd  # Player + enemy barrier logic
-      ProjectileController.gd # Movement, bounce, collision
-      EnemyAI.gd            # Tracks projectile Y, scales per duel
-      HUD.gd                # HP display
-    systems/
-      UpgradeSystem.gd      # (Phase 3) Upgrade pool, draft, stat application
-      CombatSystem.gd       # (Phase 3) HP, damage, status effects
-      RunManager.gd         # (Phase 2) Duel sequence, win/loss routing
-      TagSystem.gd          # (Phase 3) Tag-based upgrade interaction engine
-    data/
-      upgrades.gd           # (Phase 3) All upgrade definitions as Resources
-      enemies.gd            # (Phase 4) 4 enemy types + boss definitions
-  resources/
-    UpgradeData.gd          # (Phase 3) Resource class definition
-    EnemyData.gd            # (Phase 4) Resource class definition
+    GridPos.gd          # class_name GridPos — grid coordinate value object
+    GridManager.gd      # class_name GridManager — tile storage, draw, coordinate conversion
+    Unit.gd             # class_name Unit — drawn unit, selection state
+    Main.gd             # Root controller — input, unit spawn, selection
   assets/
-    sprites/
-    particles/
     audio/
+    sprites/
+```
+
+## Grid Spec
+
+- 12 wide × 20 tall tiles
+- Tile size: 32×32 px
+- Three tile types: `FLOOR`, `WALL`, `COVER`
+- Grid centered in viewport at runtime
+- Camera2D locked — no pan, no zoom
+
+## Key Data Structures
+
+```gdscript
+class_name GridPos          # GridPos.gd
+var x: int
+var y: int
+
+enum TileType { FLOOR, WALL, COVER }    # defined in GridManager
+
+class_name Unit             # Unit.gd — Phase 1 placeholder
+var unit_id: String
+var is_player: bool
+var is_leader: bool
+var grid_pos: GridPos
+var is_selected: bool
 ```
 
 ## Key Rules
 
-- Every upgrade MUST visibly change projectile behaviour — no hidden stat changes
-- ArenaController.gd owns game state. UI scenes are display-only
-- Upgrades are Resources (UpgradeData.gd), not hardcoded logic
-- Tags drive interactions — upgrades modify tags, not specific spells
-- Status effects (burn, freeze, poison) require on-screen visual indicators
-- Never put game logic in UI scripts
-
-## Arena Layout
-
-Horizontal. Player wizard left side, enemy wizard right side. Barriers move vertically (up/down) on their respective sides. Projectile spawns centre, travels at an angle. Bounce off top/bottom walls and both barriers.
-
-Viewport: 1280×720. Top wall y=0–20. Bottom wall y=700–720. Player barrier x≈50. Enemy barrier x≈1230.
-
-## Controls
-
-W / S or Up / Down — move player barrier vertically
-
-## Upgrade Draft (Phase 3)
-
-3 random upgrades shown after each victory. Click to choose. No duplicates per run. Weighted pool: Common 60% / Uncommon 30% / Rare 10%.
-
-## Enemy AI
-
-Simple tracker: move barrier toward projectile Y position each _physics_process(). Difficulty scales per duel number via `reaction_speed` and `jitter_amount` exported vars on EnemyAI.gd.
-
-## Tag System (Phase 3 — Commercial Foundation)
-
-Upgrades modify tags, not individual spells.
-Core tags: Fire, Ice, Lightning, Poison, Bounce, Split, Critical, Arcane, Shield
-Each projectile carries an Array[String] of active tags.
-Interactions happen at resolution time, not authoring time.
-
-## Upgrade Resource Shape (Phase 3)
-
-```gdscript
-class_name UpgradeData
-extends Resource
-@export var id: String
-@export var name: String
-@export var description: String
-@export_enum('Common', 'Uncommon', 'Rare') var tier: String
-@export var tags: Array[String]
-@export var visual_effect: String  # REQUIRED — empty = do not ship
-@export var apply_script: String
-```
+- `GridManager` owns all tile state and grid↔world coordinate conversion
+- `Main.gd` owns input routing and scene-level state — nothing else handles input
+- Units are children of `UnitLayer` (sibling of `GridManager`)
+- No game logic in UI scripts
+- Every phase must produce a runnable build before the next phase starts
 
 ## Phase Build Order
 
-- Phase 1 (Days 1–2): Arena + physics — CURRENT
-- Phase 2 (Day 3): Run structure + enemy scaling
-- Phase 3 (Days 4–6): Upgrade system (20 upgrades)
-- Phase 4 (Days 7–8): Enemy types (4 + boss)
-- Phase 5 (Days 9–14): Art + polish
+- **Phase 1 (current):** Grid shell — tiles, camera, unit placement, click-to-select
+- Phase 2: Combat core — turn order, movement, attack, Toughness, LOS
+- Phase 3: Enemy AI — Guardian / Rampaging / Tactical archetypes
+- Phase 4: Fractured gear economy — three-state model, field-patch, Medical slot
+- Phase 5: Environmental hazards — warning system, pressure dump activation
+- Phase 6: The Rival — Vanguard faction, Rival Rank persistence
+- Phase 7: Mission loop — Manifest screen, extraction, failure states
+- Phase 8: Terminal Hub — repair, fence, contract select, credit economy
+- Phase 9: "Containment Breach" — full hand-authored prototype mission
+- Phase 10: Polish & feel — terminal aesthetic, audio, animation
+
+## Zone Layout (Containment Breach prototype)
+
+```
+Zone C (rows 14–19): Evidence locker — leader-only interaction
+Zone B (rows  8–13): Security Bot patrol, narrow corridors, hazard tiles
+Zone A (rows  1– 7): Player entry, Feral Prisoners, Vanguard south entry
+```
+
+## Enemy Archetypes
+
+| Archetype | Behaviour | Prototype Unit |
+|---|---|---|
+| Guardian | Patrol route, engage on LOS, stay in zone | Security Bots |
+| Rampaging | Charge nearest unit regardless of faction | Feral Prisoners |
+| Tactical | Hold, wait for player weakness, advance, hunt leader | Vanguard Crew |
+
+## Gear State Model (Phase 4+)
+
+| State | Modifier | Recovery |
+|---|---|---|
+| Intact | Full | N/A |
+| Fractured | Nullified | Field-patch (1 Combat Action, once per item per mission, restores 50%) |
+| Broken | Absent, slot empty | Full repair at Terminal Hub (credit cost) |
+
+## Failure States (Phase 7+)
+
+- Leader Broken (0 Toughness twice with Fractured gear) → mission fail
+- Round limit expires (20 rounds prototype) → mission fail
+- Consequences: all crew gear Fractured, no Danger Pay, Vanguard Rank +1
 
 ## Risk Flags
 
-**Collision Tunnelling** — Use CharacterBody2D + move_and_collide(). Enable Continuous CD if needed.
+**Grid centering** — computed in `Main.gd _ready()` using `get_viewport_rect().size`, not hardcoded.
 
-**BulletUpHell Mismatch** — Test Day 1. Drop if the bounce mechanic requires fighting it. A custom 150-line ProjectileController is cleaner.
+**class_name forward references** — `GridPos` and `GridManager` must be parsed before scripts that reference them. Godot handles this via class_name registration; avoid circular dependencies.
 
-**Game State in UI Nodes** — ArenaController.gd owns ALL state. UI connects to signals only.
-
-**Upgrades Without Visual Effect** — visual_effect is required in UpgradeData. Validate on load.
-
-**Tag Explosion** — TagSystem.gd prints tag state in debug builds on every resolution.
+**Phase creep** — do not add Phase N+1 features until Phase N acceptance criteria pass.
