@@ -3,11 +3,11 @@ extends RefCounted
 
 # Dispatcher — routes to the correct archetype AI and provides shared helpers.
 
-static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager) -> Array[String]:
+static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager, round_num: int = 0) -> Array[String]:
 	match unit.archetype:
 		Unit.Archetype.GUARDIAN:  return GuardianAI.take_turn(unit, all_units, grid)
 		Unit.Archetype.RAMPAGING: return RampagingAI.take_turn(unit, all_units, grid)
-		Unit.Archetype.TACTICAL:  return TacticalAI.take_turn(unit, all_units, grid)
+		Unit.Archetype.TACTICAL:  return TacticalAI.take_turn(unit, all_units, grid, round_num)
 	return []
 
 # Move unit to pos (teleport in Phase 3; Phase 10 adds animation).
@@ -15,23 +15,25 @@ static func move_to(unit: Unit, pos: GridPos, grid: GridManager) -> void:
 	unit.place_at(pos, grid)
 	unit.has_moved = true
 
-# Apply damage. Returns damage dealt (0 if already attacked this turn).
+# Apply attack. Returns Unit.DamageResult value, or -1 if attack not made.
 static func do_attack(attacker: Unit, target: Unit) -> int:
 	if attacker.has_attacked or target.is_downed:
-		return 0
+		return -1
 	var dmg := attacker.get_weapon_damage()
-	target.take_damage(dmg)
+	var result := target.take_damage(dmg)
 	attacker.has_attacked = true
-	return dmg
+	return result
 
 # Find the reachable tile that minimises Chebyshev distance to target_pos.
 # When respect_zone is true, only considers tiles within unit.zone_min/max_row.
+# blocked_tiles are treated as impassable (used to avoid hazard warning tiles).
 static func best_move_toward(unit: Unit, target_pos: GridPos,
 		all_units: Array[Unit], grid: GridManager,
-		respect_zone: bool = true) -> GridPos:
+		respect_zone: bool = true,
+		blocked_tiles: Array[GridPos] = []) -> GridPos:
 	var occupied := occupied_positions(all_units, unit)
 	var reachable := MovementRange.get_reachable(
-		unit.grid_pos, unit.get_effective_speed(), grid, occupied)
+		unit.grid_pos, unit.get_effective_speed(), grid, occupied, blocked_tiles)
 
 	var best := unit.grid_pos
 	var best_dist := chebyshev(unit.grid_pos, target_pos)

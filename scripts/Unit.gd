@@ -2,6 +2,7 @@ class_name Unit
 extends Node2D
 
 enum Archetype { NONE, GUARDIAN, RAMPAGING, TACTICAL }
+enum DamageResult { NORMAL, GEAR_FRACTURED, GEAR_BROKEN, DOWNED }
 
 var unit_id: String = ""
 var is_player: bool = true
@@ -22,6 +23,7 @@ var gear: Array[GearItem] = []
 
 # AI archetype (enemies only)
 var archetype: int = Archetype.NONE
+var vanguard_rank: int = 1
 
 # Guardian fields
 var patrol_path: Array[GridPos] = []
@@ -75,12 +77,63 @@ func get_weapon_damage() -> int:
 func can_act() -> bool:
 	return not is_downed and not (has_moved and has_attacked)
 
-func take_damage(amount: int) -> bool:
+func has_fractured_gear() -> bool:
+	for item: GearItem in gear:
+		if item.state == GearItem.GearState.FRACTURED:
+			return true
+	return false
+
+func has_medical_kit() -> bool:
+	for item: GearItem in gear:
+		if item.slot == "medical":
+			return true
+	return false
+
+func take_damage(amount: int) -> int:
 	toughness = max(0, toughness - amount)
-	if toughness == 0:
+	if toughness > 0:
+		queue_redraw()
+		return DamageResult.NORMAL
+
+	var intact_armor := _find_intact_gear("armor")
+	if intact_armor != null:
+		intact_armor.state = GearItem.GearState.FRACTURED
+		toughness = max_toughness
+		queue_redraw()
+		return DamageResult.GEAR_FRACTURED
+
+	var intact_weapon := _find_intact_gear("weapon")
+	if intact_weapon != null:
+		intact_weapon.state = GearItem.GearState.FRACTURED
+		toughness = max_toughness
+		queue_redraw()
+		return DamageResult.GEAR_FRACTURED
+
+	var fractured_item := _find_fractured_gear()
+	if fractured_item != null:
+		fractured_item.state = GearItem.GearState.BROKEN
 		is_downed = true
+		queue_redraw()
+		return DamageResult.GEAR_BROKEN
+
+	is_downed = true
 	queue_redraw()
-	return is_downed
+	return DamageResult.DOWNED
+
+func _find_intact_gear(slot_name: String) -> GearItem:
+	for item: GearItem in gear:
+		if item.slot == slot_name and item.state == GearItem.GearState.INTACT:
+			return item
+	return null
+
+func _find_fractured_gear() -> GearItem:
+	for item: GearItem in gear:
+		if item.slot == "armor" and item.state == GearItem.GearState.FRACTURED:
+			return item
+	for item: GearItem in gear:
+		if item.slot == "weapon" and item.state == GearItem.GearState.FRACTURED:
+			return item
+	return null
 
 func select() -> void:
 	is_selected = true
@@ -121,11 +174,9 @@ func _draw() -> void:
 	if not is_player:
 		match archetype:
 			Archetype.RAMPAGING:
-				# Small jagged cross
 				draw_line(Vector2(-4, 0), Vector2(4, 0), Color(1, 1, 1, 0.5), 1.5)
 				draw_line(Vector2(0, -4), Vector2(0, 4), Color(1, 1, 1, 0.5), 1.5)
 			Archetype.TACTICAL:
-				# Small diamond
 				draw_line(Vector2(0, -5), Vector2(4, 0), Color(1, 1, 1, 0.5), 1.2)
 				draw_line(Vector2(4, 0), Vector2(0, 5),  Color(1, 1, 1, 0.5), 1.2)
 				draw_line(Vector2(0, 5), Vector2(-4, 0), Color(1, 1, 1, 0.5), 1.2)
@@ -149,3 +200,16 @@ func _draw() -> void:
 	var by := RADIUS + 3.5
 	draw_rect(Rect2(bx, by, bw, 3.0), BAR_BACK)
 	draw_rect(Rect2(bx, by, bw * (float(toughness) / float(max_toughness)), 3.0), BAR_FILL)
+
+	# Gear state notches — orange = FRACTURED, dark = BROKEN
+	var notch_x := RADIUS + 2.0
+	var notch_y := -RADIUS
+	for item: GearItem in gear:
+		if item.slot == "medical":
+			continue
+		if item.state == GearItem.GearState.FRACTURED:
+			draw_rect(Rect2(notch_x, notch_y, 4.0, 4.0), Color(1.0, 0.55, 0.0))
+			notch_y += 6.0
+		elif item.state == GearItem.GearState.BROKEN:
+			draw_rect(Rect2(notch_x, notch_y, 4.0, 4.0), Color(0.25, 0.12, 0.12))
+			notch_y += 6.0

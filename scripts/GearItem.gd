@@ -29,10 +29,25 @@ static func make_armor(id: String, mod: int) -> GearItem:
 	return g
 
 func get_effective_modifier() -> int:
-	if state == GearState.INTACT:
-		return modifier
-	# FRACTURED: nullified (field-patch in Phase 4 restores 50%)
+	match state:
+		GearState.INTACT:
+			return modifier
+		GearState.FRACTURED:
+			if patched_this_mission:
+				return modifier / 2
+			return 0
+		GearState.BROKEN:
+			return 0
 	return 0
+
+static func make_medical_kit(id: String) -> GearItem:
+	var g := GearItem.new()
+	g.item_id = id
+	g.slot = "medical"
+	g.stat_target = "combat_skill"
+	g.modifier = 0
+	g.damage = 0
+	return g
 
 func state_label() -> String:
 	match state:

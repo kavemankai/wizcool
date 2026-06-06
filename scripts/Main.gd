@@ -13,6 +13,9 @@ var input_state: InputState = InputState.IDLE
 var active_unit: Unit = null
 var move_tiles: Array[GridPos] = []
 var round_number: int = 1
+var dropped_loot: Array[GearItem] = []
+var rival_rank: int = 1
+var hazard_manager: HazardManager = null
 
 func _ready() -> void:
 	var grid_w := GridManager.GRID_WIDTH * GridManager.TILE_SIZE
@@ -23,6 +26,9 @@ func _ready() -> void:
 		floor((vp.y - grid_h) * 0.5)
 	)
 	hud.end_turn_pressed.connect(_on_end_turn)
+	hud.field_patch_pressed.connect(_on_field_patch)
+	hazard_manager = HazardManager.new()
+	rival_rank = SaveData.load_rival_rank()
 	_spawn_units()
 	hud.log("[ROUND 1 — PLAYER TURN]")
 
@@ -34,6 +40,7 @@ func _spawn_units() -> void:
 	# --- Player crew — Zone A (rows 14–18, bottom) ---
 	var alpha := _make_unit("ALPHA", true, true, 6, 2, 3, 4)
 	alpha.gear.append(GearItem.make_weapon("PLASMA-CUTTER", 2, 3))
+	alpha.gear.append(GearItem.make_medical_kit("FIELD-PATCH-KIT"))
 	_place(alpha, GridPos.new(5, 17))
 
 	var bravo := _make_unit("BRAVO", true, false, 5, 2, 4, 2)
@@ -69,11 +76,17 @@ func _spawn_units() -> void:
 	p2.archetype = Unit.Archetype.RAMPAGING
 	_place(p2, GridPos.new(7, 14))
 
-	# --- Vanguard — Zone A south edge, Tactical archetype ---
+	# --- Vanguard — rank-based spawn ---
+	_spawn_vanguard()
+
+func _spawn_vanguard() -> void:
+	var count := 2 if rival_rank == 1 else 3
+
 	var v1 := _make_unit("VANGUARD-1", false, false, 5, 2, 2, 3)
 	v1.archetype = Unit.Archetype.TACTICAL
 	v1.zone_min_row = 14
 	v1.zone_max_row = 18
+	v1.vanguard_rank = rival_rank
 	v1.gear.append(GearItem.make_weapon("SALVAGE-PISTOL", 1, 2))
 	_place(v1, GridPos.new(3, 18))
 
@@ -81,8 +94,22 @@ func _spawn_units() -> void:
 	v2.archetype = Unit.Archetype.TACTICAL
 	v2.zone_min_row = 14
 	v2.zone_max_row = 18
+	v2.vanguard_rank = rival_rank
+	if rival_rank >= 2:
+		v2.gear.append(GearItem.make_armor("BALLISTIC-PLATE", 1))
 	v2.gear.append(GearItem.make_weapon("SALVAGE-PISTOL", 1, 2))
 	_place(v2, GridPos.new(8, 18))
+
+	if count >= 3:
+		var v3 := _make_unit("VANGUARD-3", false, false, 5, 2, 2, 3)
+		v3.archetype = Unit.Archetype.TACTICAL
+		v3.zone_min_row = 14
+		v3.zone_max_row = 18
+		v3.vanguard_rank = rival_rank
+		v3.gear.append(GearItem.make_weapon("SALVAGE-PISTOL", 1, 2))
+		if rival_rank >= 3:
+			v3.gear.append(GearItem.make_medical_kit("VANGUARD-MEDKIT"))
+		_place(v3, GridPos.new(6, 18))
 
 func _make_unit(id: String, player: bool, leader: bool,
 		hp: int, cs: int, spd: int, rng: int) -> Unit:
@@ -153,6 +180,7 @@ func _select(unit: Unit) -> void:
 	unit.select()
 	_refresh_highlights()
 	hud.show_unit(unit)
+	hud.set_field_patch_visible(_can_field_patch(unit))
 	input_state = InputState.ACTING
 
 func _enter_idle() -> void:
@@ -162,6 +190,7 @@ func _enter_idle() -> void:
 	move_tiles = []
 	grid_manager.clear_all_highlights()
 	hud.show_unit(null)
+	hud.set_field_patch_visible(false)
 	input_state = InputState.IDLE
 
 func _refresh_highlights() -> void:
@@ -187,6 +216,7 @@ func _refresh_highlights() -> void:
 		grid_manager.set_attack_highlights([])
 
 	hud.show_unit(active_unit)
+	hud.set_field_patch_visible(_can_field_patch(active_unit))
 
 func _is_move_tile(pos: GridPos) -> bool:
 	for t in move_tiles:
@@ -214,16 +244,79 @@ func _do_move(unit: Unit, pos: GridPos) -> void:
 
 func _do_attack(attacker: Unit, target: Unit) -> void:
 	var dmg := attacker.get_weapon_damage()
-	var downed := target.take_damage(dmg)
+	var result := target.take_damage(dmg)
 	attacker.has_attacked = true
-	hud.log("%s → %s  -%d TGH  [%d/%d]" % [
-		attacker.unit_id, target.unit_id, dmg,
-		target.toughness, target.max_toughness])
-	if downed:
-		hud.log("%s DOWNED" % target.unit_id)
-		target.queue_free()
-		units.erase(target)
+	match result:
+		Unit.DamageResult.NORMAL:
+			hud.log("%s → %s  -%d TGH  [%d/%d]" % [
+				attacker.unit_id, target.unit_id, dmg,
+				target.toughness, target.max_toughness])
+		Unit.DamageResult.GEAR_FRACTURED:
+			var item := _find_gear_by_state(target, GearItem.GearState.FRACTURED)
+			var slot_name := item.slot.to_upper() if item else "GEAR"
+			hud.log("%s → %s  %s FRACTURED — TGH RESET" % [
+				attacker.unit_id, target.unit_id, slot_name])
+		Unit.DamageResult.GEAR_BROKEN:
+			var item := _find_gear_by_state(target, GearItem.GearState.BROKEN)
+			var slot_name := item.slot.to_upper() if item else "GEAR"
+			hud.log("%s → %s  %s BROKEN" % [
+				attacker.unit_id, target.unit_id, slot_name])
+		Unit.DamageResult.DOWNED:
+			hud.log("%s → %s  -%d TGH" % [
+				attacker.unit_id, target.unit_id, dmg])
+	if target.is_downed:
+		_flush_downed()
 		_check_game_over()
+
+# ---------------------------------------------------------------------------
+# Field Patch action
+# ---------------------------------------------------------------------------
+
+func _can_field_patch(unit: Unit) -> bool:
+	if not unit or not unit.is_player or unit.has_attacked:
+		return false
+	if not unit.has_medical_kit():
+		return false
+	for item: GearItem in unit.gear:
+		if item.slot != "medical" and item.state == GearItem.GearState.FRACTURED and not item.patched_this_mission:
+			return true
+	return false
+
+func _on_field_patch() -> void:
+	if active_unit == null or not _can_field_patch(active_unit):
+		return
+
+	var target_item: GearItem = null
+	for item: GearItem in active_unit.gear:
+		if item.slot == "armor" and item.state == GearItem.GearState.FRACTURED and not item.patched_this_mission:
+			target_item = item
+			break
+	if target_item == null:
+		for item: GearItem in active_unit.gear:
+			if item.slot == "weapon" and item.state == GearItem.GearState.FRACTURED and not item.patched_this_mission:
+				target_item = item
+				break
+	if target_item == null:
+		return
+
+	var kit_index := -1
+	for i in active_unit.gear.size():
+		if active_unit.gear[i].slot == "medical":
+			kit_index = i
+			break
+	if kit_index < 0:
+		return
+
+	target_item.patched_this_mission = true
+	active_unit.gear.remove_at(kit_index)
+	active_unit.has_attacked = true
+	active_unit.queue_redraw()
+	hud.log("%s FIELD-PATCHES %s [+%d MOD RESTORED]" % [
+		active_unit.unit_id, target_item.item_id, target_item.modifier / 2])
+	_refresh_highlights()
+	hud.set_field_patch_visible(false)
+	if not active_unit.can_act():
+		_enter_idle()
 
 # ---------------------------------------------------------------------------
 # Turn management
@@ -255,7 +348,7 @@ func _run_enemy_phase() -> void:
 
 		await get_tree().create_timer(0.3).timeout
 
-		var lines := EnemyAI.take_turn(enemy, units, grid_manager)
+		var lines := EnemyAI.take_turn(enemy, units, grid_manager, round_number)
 		for line in lines:
 			hud.log(line)
 
@@ -264,6 +357,31 @@ func _run_enemy_phase() -> void:
 
 	if game_phase == GamePhase.GAME_OVER:
 		return
+
+	# Apply hazard damage to any unit on warning tiles
+	var warned := grid_manager.get_warning_tiles()
+	if warned.size() > 0:
+		for u in units.duplicate():
+			if u.is_downed:
+				continue
+			for wp in warned:
+				if u.grid_pos.equals(wp):
+					var result := u.take_damage(HazardManager.HAZARD_DAMAGE)
+					match result:
+						Unit.DamageResult.NORMAL:
+							hud.log("[HAZARD] %s  -%d TGH  [%d/%d]" % [
+								u.unit_id, HazardManager.HAZARD_DAMAGE,
+								u.toughness, u.max_toughness])
+						Unit.DamageResult.GEAR_FRACTURED:
+							hud.log("[HAZARD] %s  GEAR FRACTURED — TGH RESET" % u.unit_id)
+						Unit.DamageResult.GEAR_BROKEN, Unit.DamageResult.DOWNED:
+							hud.log("[HAZARD] %s DOWNED" % u.unit_id)
+					break
+		grid_manager.clear_warning_tiles()
+		_flush_downed()
+		_check_game_over()
+		if game_phase == GamePhase.GAME_OVER:
+			return
 
 	await get_tree().create_timer(0.4).timeout
 
@@ -274,19 +392,29 @@ func _run_enemy_phase() -> void:
 			u.has_attacked = false
 			u.queue_redraw()
 
+	# Set warning tiles for the new round if a hazard is incoming
+	var next_zone := hazard_manager.get_active_zone(round_number)
+	if next_zone.size() > 0:
+		grid_manager.set_warning_tiles(next_zone)
+		hud.log("[WARNING] HAZARD ZONE ACTIVE — CLEAR THE AREA")
+
 	game_phase = GamePhase.PLAYER_TURN
 	hud.set_phase(true)
 	hud.log("--- ROUND %d — PLAYER TURN ---" % round_number)
 
-# Remove units flagged as downed by AI this turn
+# Remove units flagged as downed; collect loot from downed Vanguard units.
 func _flush_downed() -> void:
 	var to_remove: Array[Unit] = []
 	for u in units:
 		if u.is_downed:
 			to_remove.append(u)
 	for u in to_remove:
-		if u.is_downed:
-			hud.log("%s DOWNED" % u.unit_id)
+		hud.log("%s DOWNED" % u.unit_id)
+		if u.archetype == Unit.Archetype.TACTICAL:
+			for item: GearItem in u.gear:
+				if item.state == GearItem.GearState.BROKEN:
+					dropped_loot.append(item)
+					hud.log("[LOOT] %s DROPPED" % item.item_id)
 		units.erase(u)
 		u.queue_free()
 
@@ -308,6 +436,9 @@ func _check_game_over() -> void:
 		game_phase = GamePhase.GAME_OVER
 	elif players_up == 0:
 		hud.log("=== ALL CREW DOWN — MISSION FAILED ===")
+		rival_rank += 1
+		SaveData.save_rival_rank(rival_rank)
+		hud.log("VANGUARD RANK NOW %d" % rival_rank)
 		game_phase = GamePhase.GAME_OVER
 
 # ---------------------------------------------------------------------------
@@ -326,3 +457,9 @@ func _occupied_positions(exclude: Unit) -> Array[GridPos]:
 		if u != exclude and not u.is_downed:
 			result.append(u.grid_pos)
 	return result
+
+func _find_gear_by_state(unit: Unit, state: int) -> GearItem:
+	for item: GearItem in unit.gear:
+		if item.state == state:
+			return item
+	return null

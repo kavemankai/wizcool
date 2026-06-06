@@ -2,12 +2,13 @@ class_name MovementRange
 extends RefCounted
 
 # BFS flood-fill to find all tiles reachable within range_val cardinal steps.
-# Excludes wall tiles and tiles occupied by other units.
+# Excludes wall tiles, tiles occupied by other units, and optional blocked_tiles.
 static func get_reachable(
 		origin: GridPos,
 		range_val: int,
 		grid: GridManager,
-		occupied: Array[GridPos]) -> Array[GridPos]:
+		occupied: Array[GridPos],
+		blocked_tiles: Array[GridPos] = []) -> Array[GridPos]:
 
 	var visited: Dictionary = {}
 	var frontier: Array[GridPos] = [origin]
@@ -29,6 +30,8 @@ static func get_reachable(
 					continue
 				if _is_occupied(nb, occupied):
 					continue
+				if _is_blocked(nb, blocked_tiles):
+					continue
 				visited[key] = dist + 1
 				result.append(nb)
 				next.append(nb)
@@ -46,6 +49,12 @@ static func _neighbors(pos: GridPos) -> Array[GridPos]:
 
 static func _is_occupied(pos: GridPos, occupied: Array[GridPos]) -> bool:
 	for p in occupied:
+		if p.x == pos.x and p.y == pos.y:
+			return true
+	return false
+
+static func _is_blocked(pos: GridPos, blocked: Array[GridPos]) -> bool:
+	for p in blocked:
 		if p.x == pos.x and p.y == pos.y:
 			return true
 	return false

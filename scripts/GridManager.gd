@@ -5,7 +5,7 @@ const GRID_WIDTH: int = 12
 const GRID_HEIGHT: int = 20
 const TILE_SIZE: int = 32
 
-enum TileType { FLOOR, WALL, COVER }
+enum TileType { FLOOR, WALL, COVER, HAZARD_ZONE }
 
 const TILE_COLORS: Dictionary = {
 	0: Color(0.10, 0.11, 0.13),   # FLOOR
@@ -15,10 +15,12 @@ const TILE_COLORS: Dictionary = {
 const LINE_COLOR          := Color(0.22, 0.25, 0.30, 0.55)
 const MOVE_HIGHLIGHT      := Color(0.25, 0.60, 0.25, 0.35)
 const ATTACK_HIGHLIGHT    := Color(0.75, 0.18, 0.18, 0.40)
+const WARNING_HIGHLIGHT   := Color(0.90, 0.80, 0.10, 0.45)
 
 var tiles: Array = []
 var _move_highlights: Array[GridPos] = []
 var _attack_highlights: Array[GridPos] = []
+var _warning_tiles: Array[GridPos] = []
 
 func _ready() -> void:
 	_init_tiles()
@@ -89,6 +91,9 @@ func _draw() -> void:
 	for pos in _attack_highlights:
 		draw_rect(Rect2(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE), ATTACK_HIGHLIGHT)
 
+	for pos in _warning_tiles:
+		draw_rect(Rect2(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE), WARNING_HIGHLIGHT)
+
 func get_tile_type(pos: GridPos) -> int:
 	if not is_in_bounds(pos):
 		return TileType.WALL
@@ -122,3 +127,20 @@ func clear_all_highlights() -> void:
 	_move_highlights = []
 	_attack_highlights = []
 	queue_redraw()
+
+func set_warning_tiles(positions: Array[GridPos]) -> void:
+	_warning_tiles = positions
+	queue_redraw()
+
+func clear_warning_tiles() -> void:
+	_warning_tiles = []
+	queue_redraw()
+
+func get_warning_tiles() -> Array[GridPos]:
+	return _warning_tiles
+
+func is_hazard_warned(pos: GridPos) -> bool:
+	for p in _warning_tiles:
+		if p.x == pos.x and p.y == pos.y:
+			return true
+	return false

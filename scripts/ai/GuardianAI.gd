@@ -21,19 +21,20 @@ static func _pursue_and_attack(
 		unit: Unit, target: Unit,
 		all_units: Array[Unit], grid: GridManager,
 		log: Array[String]) -> void:
+	var warning := grid.get_warning_tiles()
 	if not unit.has_moved:
 		if not EnemyAI.can_attack(unit, target, grid):
-			var dest := EnemyAI.best_move_toward(unit, target.grid_pos, all_units, grid, true)
+			var dest := EnemyAI.best_move_toward(unit, target.grid_pos, all_units, grid, true, warning)
 			if not dest.equals(unit.grid_pos):
 				EnemyAI.move_to(unit, dest, grid)
 				log.append("%s MOVES → [%d,%d]" % [unit.unit_id, dest.x, dest.y])
 
 	if EnemyAI.can_attack(unit, target, grid):
-		var dmg := EnemyAI.do_attack(unit, target)
-		if dmg > 0:
-			log.append("%s ATTACKS %s  -%d TGH  [%d/%d]" % [
-				unit.unit_id, target.unit_id, dmg,
-				target.toughness, target.max_toughness])
+		var result := EnemyAI.do_attack(unit, target)
+		if result >= 0:
+			log.append("%s ATTACKS %s  [%d/%d]%s" % [
+				unit.unit_id, target.unit_id,
+				target.toughness, target.max_toughness, _attack_suffix(result)])
 	else:
 		log.append("%s SIGHTS %s — OUT OF RANGE" % [unit.unit_id, target.unit_id])
 
@@ -47,17 +48,16 @@ static func _patrol_step(
 
 	var wp := unit.patrol_path[unit.patrol_index]
 
-	# Advance waypoint index if already standing on it
 	if unit.grid_pos.equals(wp):
 		unit.patrol_index = (unit.patrol_index + 1) % unit.patrol_path.size()
 		wp = unit.patrol_path[unit.patrol_index]
 
-	var dest := EnemyAI.best_move_toward(unit, wp, all_units, grid, true)
+	var warning := grid.get_warning_tiles()
+	var dest := EnemyAI.best_move_toward(unit, wp, all_units, grid, true, warning)
 	if not dest.equals(unit.grid_pos):
 		EnemyAI.move_to(unit, dest, grid)
 		log.append("%s PATROLS → [%d,%d]" % [unit.unit_id, dest.x, dest.y])
 
-		# Mark waypoint reached after moving
 		if unit.grid_pos.equals(unit.patrol_path[unit.patrol_index]):
 			unit.patrol_index = (unit.patrol_index + 1) % unit.patrol_path.size()
 	else:
@@ -75,3 +75,10 @@ static func _nearest_player_in_los(unit: Unit, all_units: Array[Unit], grid: Gri
 				best = d
 				nearest = u
 	return nearest
+
+static func _attack_suffix(result: int) -> String:
+	if result == Unit.DamageResult.GEAR_FRACTURED:
+		return " [GEAR FRACTURED]"
+	elif result == Unit.DamageResult.GEAR_BROKEN or result == Unit.DamageResult.DOWNED:
+		return " [DOWNED]"
+	return ""

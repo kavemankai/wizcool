@@ -2,11 +2,13 @@ class_name HUD
 extends CanvasLayer
 
 signal end_turn_pressed
+signal field_patch_pressed
 
 var _phase_label: Label
 var _unit_label: Label
 var _log_label: Label
 var _end_turn_btn: Button
+var _field_patch_btn: Button
 
 var _log_lines: Array[String] = []
 const MAX_LOG := 8
@@ -20,7 +22,7 @@ func _ready() -> void:
 	_phase_label = _label(root, Rect2(530, 6, 220, 26), "PLAYER TURN",
 			HORIZONTAL_ALIGNMENT_CENTER)
 
-	_unit_label = _label(root, Rect2(908, 6, 364, 160), "")
+	_unit_label = _label(root, Rect2(908, 6, 364, 200), "")
 
 	_log_label = _label(root, Rect2(6, 592, 434, 122), "")
 
@@ -31,6 +33,15 @@ func _ready() -> void:
 	_end_turn_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_end_turn_btn.pressed.connect(func() -> void: end_turn_pressed.emit())
 	root.add_child(_end_turn_btn)
+
+	_field_patch_btn = Button.new()
+	_field_patch_btn.set_position(Vector2(1108, 608))
+	_field_patch_btn.set_size(Vector2(164, 38))
+	_field_patch_btn.text = "FIELD PATCH"
+	_field_patch_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_field_patch_btn.visible = false
+	_field_patch_btn.pressed.connect(func() -> void: field_patch_pressed.emit())
+	root.add_child(_field_patch_btn)
 
 func _label(parent: Control, rect: Rect2, text: String,
 		align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
@@ -46,6 +57,9 @@ func _label(parent: Control, rect: Rect2, text: String,
 
 func set_phase(player_turn: bool) -> void:
 	_phase_label.text = "PLAYER TURN" if player_turn else "ENEMY TURN"
+
+func set_field_patch_visible(show: bool) -> void:
+	_field_patch_btn.visible = show
 
 func show_unit(unit: Unit) -> void:
 	if unit == null:
@@ -64,6 +78,8 @@ func show_unit(unit: Unit) -> void:
 	if unit.has_attacked: acts.append("ATTACKED")
 	if acts.size() > 0:
 		lines.append("[" + "  /  ".join(acts) + "]")
+	for item: GearItem in unit.gear:
+		lines.append("  %s [%s]" % [item.item_id, item.state_label()])
 	_unit_label.text = "\n".join(lines)
 
 func log(msg: String) -> void:
