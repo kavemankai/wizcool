@@ -3,10 +3,6 @@ extends Node2D
 enum GamePhase { PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 enum InputState { IDLE, ACTING }
 
-@onready var grid_manager: GridManager = $GridManager
-@onready var unit_layer: Node2D = $UnitLayer
-@onready var hud: HUD = $HUD
-
 var units: Array[Unit] = []
 var game_phase: GamePhase = GamePhase.PLAYER_TURN
 var input_state: InputState = InputState.IDLE
@@ -16,6 +12,10 @@ var round_number: int = 1
 var dropped_loot: Array[GearItem] = []
 var rival_rank: int = 1
 var hazard_manager: HazardManager = null
+
+@onready var grid_manager: GridManager = $GridManager
+@onready var unit_layer: Node2D = $UnitLayer
+@onready var hud: HUD = $HUD
 
 func _ready() -> void:
 	var grid_w := GridManager.GRID_WIDTH * GridManager.TILE_SIZE
@@ -281,7 +281,8 @@ func _can_field_patch(unit: Unit) -> bool:
 	if not unit.has_medical_kit():
 		return false
 	for item: GearItem in unit.gear:
-		if item.slot != "medical" and item.state == GearItem.GearState.FRACTURED and not item.patched_this_mission:
+		if item.slot != "medical" and item.state == GearItem.GearState.FRACTURED \
+				and not item.patched_this_mission:
 			return true
 	return false
 
@@ -291,12 +292,14 @@ func _on_field_patch() -> void:
 
 	var target_item: GearItem = null
 	for item: GearItem in active_unit.gear:
-		if item.slot == "armor" and item.state == GearItem.GearState.FRACTURED and not item.patched_this_mission:
+		if item.slot == "armor" and item.state == GearItem.GearState.FRACTURED \
+				and not item.patched_this_mission:
 			target_item = item
 			break
 	if target_item == null:
 		for item: GearItem in active_unit.gear:
-			if item.slot == "weapon" and item.state == GearItem.GearState.FRACTURED and not item.patched_this_mission:
+			if item.slot == "weapon" and item.state == GearItem.GearState.FRACTURED \
+					and not item.patched_this_mission:
 				target_item = item
 				break
 	if target_item == null:

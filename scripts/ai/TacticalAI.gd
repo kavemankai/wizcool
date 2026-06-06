@@ -5,7 +5,8 @@ extends RefCounted
 # Priority target: the leader. Tracks last known leader position.
 # Does not attack Guardian or Rampaging units (faction awareness).
 
-static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager, round_num: int = 0) -> Array[String]:
+static func take_turn(unit: Unit, all_units: Array[Unit],
+		grid: GridManager, round_num: int = 0) -> Array[String]:
 	var log: Array[String] = []
 
 	# Rank 3+: forced advance at round 3 regardless of board state
@@ -101,6 +102,6 @@ static func _nearest_player_in_range(unit: Unit, all_units: Array[Unit], grid: G
 static func _attack_suffix(result: int) -> String:
 	if result == Unit.DamageResult.GEAR_FRACTURED:
 		return " [GEAR FRACTURED]"
-	elif result == Unit.DamageResult.GEAR_BROKEN or result == Unit.DamageResult.DOWNED:
+	if result == Unit.DamageResult.GEAR_BROKEN or result == Unit.DamageResult.DOWNED:
 		return " [DOWNED]"
 	return ""

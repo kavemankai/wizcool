@@ -1,11 +1,11 @@
 class_name GridManager
 extends Node2D
 
+enum TileType { FLOOR, WALL, COVER, HAZARD_ZONE }
+
 const GRID_WIDTH: int = 12
 const GRID_HEIGHT: int = 20
 const TILE_SIZE: int = 32
-
-enum TileType { FLOOR, WALL, COVER, HAZARD_ZONE }
 
 const TILE_COLORS: Dictionary = {
 	0: Color(0.10, 0.11, 0.13),   # FLOOR

@@ -4,6 +4,8 @@ extends CanvasLayer
 signal end_turn_pressed
 signal field_patch_pressed
 
+const MAX_LOG := 8
+
 var _phase_label: Label
 var _unit_label: Label
 var _log_label: Label
@@ -11,7 +13,6 @@ var _end_turn_btn: Button
 var _field_patch_btn: Button
 
 var _log_lines: Array[String] = []
-const MAX_LOG := 8
 
 func _ready() -> void:
 	var root := Control.new()

@@ -3,7 +3,8 @@ extends RefCounted
 
 # Dispatcher — routes to the correct archetype AI and provides shared helpers.
 
-static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager, round_num: int = 0) -> Array[String]:
+static func take_turn(unit: Unit, all_units: Array[Unit],
+		grid: GridManager, round_num: int = 0) -> Array[String]:
 	match unit.archetype:
 		Unit.Archetype.GUARDIAN:  return GuardianAI.take_turn(unit, all_units, grid)
 		Unit.Archetype.RAMPAGING: return RampagingAI.take_turn(unit, all_units, grid)

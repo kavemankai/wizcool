@@ -4,6 +4,18 @@ extends Node2D
 enum Archetype { NONE, GUARDIAN, RAMPAGING, TACTICAL }
 enum DamageResult { NORMAL, GEAR_FRACTURED, GEAR_BROKEN, DOWNED }
 
+const RADIUS: float = 10.0
+const PLAYER_COLOR    := Color(0.22, 0.52, 0.82)
+const GUARDIAN_COLOR  := Color(0.65, 0.20, 0.15)
+const RAMPAGING_COLOR := Color(0.80, 0.38, 0.08)
+const TACTICAL_COLOR  := Color(0.48, 0.10, 0.22)
+const LEADER_RING     := Color(0.90, 0.80, 0.10)
+const SELECT_RING     := Color(0.90, 0.90, 0.35)
+const ALERT_RING      := Color(0.95, 0.45, 0.10)
+const ADVANCE_RING    := Color(0.80, 0.10, 0.30)
+const BAR_BACK        := Color(0.25, 0.08, 0.08)
+const BAR_FILL        := Color(0.15, 0.75, 0.25)
+
 var unit_id: String = ""
 var is_player: bool = true
 var is_leader: bool = false
@@ -41,18 +53,6 @@ var has_moved: bool = false
 var has_attacked: bool = false
 var is_downed: bool = false
 var is_selected: bool = false
-
-const RADIUS: float = 10.0
-const PLAYER_COLOR    := Color(0.22, 0.52, 0.82)
-const GUARDIAN_COLOR  := Color(0.65, 0.20, 0.15)
-const RAMPAGING_COLOR := Color(0.80, 0.38, 0.08)
-const TACTICAL_COLOR  := Color(0.48, 0.10, 0.22)
-const LEADER_RING     := Color(0.90, 0.80, 0.10)
-const SELECT_RING     := Color(0.90, 0.90, 0.35)
-const ALERT_RING      := Color(0.95, 0.45, 0.10)
-const ADVANCE_RING    := Color(0.80, 0.10, 0.30)
-const BAR_BACK        := Color(0.25, 0.08, 0.08)
-const BAR_FILL        := Color(0.15, 0.75, 0.25)
 
 func get_effective_combat_skill() -> int:
 	var total := combat_skill
