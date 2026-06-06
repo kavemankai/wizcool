@@ -1,6 +1,6 @@
 extends Node2D
 
-enum GamePhase { PLAYER_TURN, ENEMY_TURN }
+enum GamePhase { PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 enum InputState { IDLE, ACTING }
 
 @onready var grid_manager: GridManager = $GridManager
@@ -31,7 +31,7 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 func _spawn_units() -> void:
-	# Zone A = rows 14–18 (bottom) — player entry
+	# --- Player crew — Zone A (rows 14–18, bottom) ---
 	var alpha := _make_unit("ALPHA", true, true, 6, 2, 3, 4)
 	alpha.gear.append(GearItem.make_weapon("PLASMA-CUTTER", 2, 3))
 	_place(alpha, GridPos.new(5, 17))
@@ -45,12 +45,44 @@ func _spawn_units() -> void:
 	charlie.gear.append(GearItem.make_weapon("LONG-BORE-DRILL", 1, 2))
 	_place(charlie, GridPos.new(7, 16))
 
-	# Zone B = rows 8–12 (middle) — Security Bots
-	var s1 := _make_unit("SENTINEL-1", false, false, 4, 2, 2, 3)
-	_place(s1, GridPos.new(4, 10))
+	# --- Security Bots — Zone B (rows 8–12), Guardian archetype ---
+	var s1 := _make_unit("SENTINEL-1", false, false, 4, 2, 2, 2)
+	s1.archetype = Unit.Archetype.GUARDIAN
+	s1.zone_min_row = 8
+	s1.zone_max_row = 12
+	s1.patrol_path = [GridPos.new(3, 8), GridPos.new(3, 11)]
+	_place(s1, GridPos.new(3, 8))
 
-	var s2 := _make_unit("SENTINEL-2", false, false, 4, 2, 2, 3)
-	_place(s2, GridPos.new(8, 10))
+	var s2 := _make_unit("SENTINEL-2", false, false, 4, 2, 2, 2)
+	s2.archetype = Unit.Archetype.GUARDIAN
+	s2.zone_min_row = 8
+	s2.zone_max_row = 12
+	s2.patrol_path = [GridPos.new(8, 8), GridPos.new(8, 11)]
+	_place(s2, GridPos.new(8, 8))
+
+	# --- Feral Prisoners — Zone A/B boundary, Rampaging archetype ---
+	var p1 := _make_unit("PRISONER-1", false, false, 3, 2, 4, 1)
+	p1.archetype = Unit.Archetype.RAMPAGING
+	_place(p1, GridPos.new(4, 14))
+
+	var p2 := _make_unit("PRISONER-2", false, false, 3, 2, 4, 1)
+	p2.archetype = Unit.Archetype.RAMPAGING
+	_place(p2, GridPos.new(7, 14))
+
+	# --- Vanguard — Zone A south edge, Tactical archetype ---
+	var v1 := _make_unit("VANGUARD-1", false, false, 5, 2, 2, 3)
+	v1.archetype = Unit.Archetype.TACTICAL
+	v1.zone_min_row = 14
+	v1.zone_max_row = 18
+	v1.gear.append(GearItem.make_weapon("SALVAGE-PISTOL", 1, 2))
+	_place(v1, GridPos.new(3, 18))
+
+	var v2 := _make_unit("VANGUARD-2", false, false, 5, 2, 2, 3)
+	v2.archetype = Unit.Archetype.TACTICAL
+	v2.zone_min_row = 14
+	v2.zone_max_row = 18
+	v2.gear.append(GearItem.make_weapon("SALVAGE-PISTOL", 1, 2))
+	_place(v2, GridPos.new(8, 18))
 
 func _make_unit(id: String, player: bool, leader: bool,
 		hp: int, cs: int, spd: int, rng: int) -> Unit:
@@ -134,27 +166,23 @@ func _enter_idle() -> void:
 
 func _refresh_highlights() -> void:
 	move_tiles = []
-
 	if not active_unit.has_moved:
 		var occupied := _occupied_positions(active_unit)
 		move_tiles = MovementRange.get_reachable(
-			active_unit.grid_pos,
-			active_unit.get_effective_speed(),
-			grid_manager,
-			occupied
-		)
+			active_unit.grid_pos, active_unit.get_effective_speed(),
+			grid_manager, occupied)
 		grid_manager.set_move_highlights(move_tiles)
 	else:
 		grid_manager.set_move_highlights([])
 
 	if not active_unit.has_attacked:
-		var atk_tiles: Array[GridPos] = []
+		var atk: Array[GridPos] = []
 		for u in units:
 			if u.is_player == active_unit.is_player or u.is_downed:
 				continue
 			if _can_attack(active_unit, u):
-				atk_tiles.append(u.grid_pos)
-		grid_manager.set_attack_highlights(atk_tiles)
+				atk.append(u.grid_pos)
+		grid_manager.set_attack_highlights(atk)
 	else:
 		grid_manager.set_attack_highlights([])
 
@@ -167,7 +195,7 @@ func _is_move_tile(pos: GridPos) -> bool:
 	return false
 
 # ---------------------------------------------------------------------------
-# Combat
+# Combat (player side)
 # ---------------------------------------------------------------------------
 
 func _can_attack(attacker: Unit, target: Unit) -> bool:
@@ -190,28 +218,12 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 	attacker.has_attacked = true
 	hud.log("%s → %s  -%d TGH  [%d/%d]" % [
 		attacker.unit_id, target.unit_id, dmg,
-		target.toughness, target.max_toughness
-	])
+		target.toughness, target.max_toughness])
 	if downed:
 		hud.log("%s DOWNED" % target.unit_id)
 		target.queue_free()
 		units.erase(target)
 		_check_game_over()
-
-func _check_game_over() -> void:
-	var players_up := 0
-	var enemies_up := 0
-	for u in units:
-		if u.is_player:
-			players_up += 1
-		else:
-			enemies_up += 1
-	if enemies_up == 0:
-		hud.log("=== AREA CLEAR ===")
-		game_phase = GamePhase.ENEMY_TURN
-	elif players_up == 0:
-		hud.log("=== ALL CREW DOWN — MISSION FAILED ===")
-		game_phase = GamePhase.ENEMY_TURN
 
 # ---------------------------------------------------------------------------
 # Turn management
@@ -228,11 +240,32 @@ func _run_enemy_phase() -> void:
 	hud.set_phase(false)
 	hud.log("--- ENEMY PHASE ---")
 
-	for u in units:
-		if not u.is_player and not u.is_downed:
-			hud.log("%s HOLDS" % u.unit_id)
+	# Build ordered queue: Guardian → Rampaging → Tactical
+	var queue: Array[Unit] = []
+	for archetype_val in [Unit.Archetype.GUARDIAN, Unit.Archetype.RAMPAGING, Unit.Archetype.TACTICAL]:
+		for u in units:
+			if not u.is_player and not u.is_downed and u.archetype == archetype_val:
+				queue.append(u)
 
-	await get_tree().create_timer(0.8).timeout
+	for enemy in queue:
+		if game_phase == GamePhase.GAME_OVER:
+			return
+		if enemy.is_downed:
+			continue
+
+		await get_tree().create_timer(0.3).timeout
+
+		var lines := EnemyAI.take_turn(enemy, units, grid_manager)
+		for line in lines:
+			hud.log(line)
+
+		_flush_downed()
+		_check_game_over()
+
+	if game_phase == GamePhase.GAME_OVER:
+		return
+
+	await get_tree().create_timer(0.4).timeout
 
 	round_number += 1
 	for u in units:
@@ -244,6 +277,38 @@ func _run_enemy_phase() -> void:
 	game_phase = GamePhase.PLAYER_TURN
 	hud.set_phase(true)
 	hud.log("--- ROUND %d — PLAYER TURN ---" % round_number)
+
+# Remove units flagged as downed by AI this turn
+func _flush_downed() -> void:
+	var to_remove: Array[Unit] = []
+	for u in units:
+		if u.is_downed:
+			to_remove.append(u)
+	for u in to_remove:
+		if u.is_downed:
+			hud.log("%s DOWNED" % u.unit_id)
+		units.erase(u)
+		u.queue_free()
+
+# ---------------------------------------------------------------------------
+# Game-over detection
+# ---------------------------------------------------------------------------
+
+func _check_game_over() -> void:
+	var players_up := 0
+	var enemies_up := 0
+	for u in units:
+		if u.is_player:
+			players_up += 1
+		else:
+			enemies_up += 1
+
+	if enemies_up == 0:
+		hud.log("=== AREA CLEAR ===")
+		game_phase = GamePhase.GAME_OVER
+	elif players_up == 0:
+		hud.log("=== ALL CREW DOWN — MISSION FAILED ===")
+		game_phase = GamePhase.GAME_OVER
 
 # ---------------------------------------------------------------------------
 # Helpers

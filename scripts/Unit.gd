@@ -1,6 +1,8 @@
 class_name Unit
 extends Node2D
 
+enum Archetype { NONE, GUARDIAN, RAMPAGING, TACTICAL }
+
 var unit_id: String = ""
 var is_player: bool = true
 var is_leader: bool = false
@@ -18,6 +20,20 @@ var max_toughness: int = 5
 # Gear
 var gear: Array[GearItem] = []
 
+# AI archetype (enemies only)
+var archetype: int = Archetype.NONE
+
+# Guardian fields
+var patrol_path: Array[GridPos] = []
+var patrol_index: int = 0
+var zone_min_row: int = -1   # -1 = no boundary
+var zone_max_row: int = -1
+var is_alerted: bool = false
+
+# Tactical fields
+var advance_triggered: bool = false
+var last_known_leader_pos: GridPos = null
+
 # Turn state
 var has_moved: bool = false
 var has_attacked: bool = false
@@ -26,9 +42,13 @@ var is_selected: bool = false
 
 const RADIUS: float = 10.0
 const PLAYER_COLOR    := Color(0.22, 0.52, 0.82)
-const ENEMY_COLOR     := Color(0.72, 0.22, 0.18)
+const GUARDIAN_COLOR  := Color(0.65, 0.20, 0.15)
+const RAMPAGING_COLOR := Color(0.80, 0.38, 0.08)
+const TACTICAL_COLOR  := Color(0.48, 0.10, 0.22)
 const LEADER_RING     := Color(0.90, 0.80, 0.10)
 const SELECT_RING     := Color(0.90, 0.90, 0.35)
+const ALERT_RING      := Color(0.95, 0.45, 0.10)
+const ADVANCE_RING    := Color(0.80, 0.10, 0.30)
 const BAR_BACK        := Color(0.25, 0.08, 0.08)
 const BAR_FILL        := Color(0.15, 0.75, 0.25)
 
@@ -82,14 +102,43 @@ func _draw() -> void:
 		draw_circle(Vector2.ZERO, RADIUS, Color(0.28, 0.28, 0.28, 0.4))
 		return
 
-	var fill := PLAYER_COLOR if is_player else ENEMY_COLOR
+	var fill: Color
+	if is_player:
+		fill = PLAYER_COLOR
+	else:
+		match archetype:
+			Archetype.GUARDIAN:  fill = GUARDIAN_COLOR
+			Archetype.RAMPAGING: fill = RAMPAGING_COLOR
+			Archetype.TACTICAL:  fill = TACTICAL_COLOR
+			_:                   fill = GUARDIAN_COLOR
+
 	if has_moved and has_attacked:
 		fill = fill.lerp(Color(0.3, 0.3, 0.3), 0.45)
 
 	draw_circle(Vector2.ZERO, RADIUS, fill)
 
+	# Archetype indicator for enemies
+	if not is_player:
+		match archetype:
+			Archetype.RAMPAGING:
+				# Small jagged cross
+				draw_line(Vector2(-4, 0), Vector2(4, 0), Color(1, 1, 1, 0.5), 1.5)
+				draw_line(Vector2(0, -4), Vector2(0, 4), Color(1, 1, 1, 0.5), 1.5)
+			Archetype.TACTICAL:
+				# Small diamond
+				draw_line(Vector2(0, -5), Vector2(4, 0), Color(1, 1, 1, 0.5), 1.2)
+				draw_line(Vector2(4, 0), Vector2(0, 5),  Color(1, 1, 1, 0.5), 1.2)
+				draw_line(Vector2(0, 5), Vector2(-4, 0), Color(1, 1, 1, 0.5), 1.2)
+				draw_line(Vector2(-4, 0), Vector2(0, -5),Color(1, 1, 1, 0.5), 1.2)
+
 	if is_leader:
 		draw_arc(Vector2.ZERO, RADIUS + 3.5, 0.0, TAU, 32, LEADER_RING, 1.5)
+
+	if is_alerted:
+		draw_arc(Vector2.ZERO, RADIUS + 3.5, 0.0, TAU, 16, ALERT_RING, 1.5)
+
+	if advance_triggered:
+		draw_arc(Vector2.ZERO, RADIUS + 3.5, 0.0, TAU, 16, ADVANCE_RING, 1.5)
 
 	if is_selected:
 		draw_arc(Vector2.ZERO, RADIUS + 7.0, 0.0, TAU, 32, SELECT_RING, 2.0)
