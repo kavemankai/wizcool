@@ -6,6 +6,7 @@ signal field_patch_pressed
 
 const MAX_LOG := 8
 
+var _mission_label: Label
 var _phase_label: Label
 var _round_label: Label
 var _unit_label: Label
@@ -21,9 +22,12 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 
-	_phase_label = _label(root, Rect2(530, 6, 220, 22), "PLAYER TURN",
+	_mission_label = _label(root, Rect2(6, 6, 340, 20), "CONTAINMENT BREACH",
+			HORIZONTAL_ALIGNMENT_LEFT)
+
+	_phase_label = _label(root, Rect2(530, 6, 220, 20), "PLAYER TURN",
 			HORIZONTAL_ALIGNMENT_CENTER)
-	_round_label = _label(root, Rect2(530, 28, 220, 18), "ROUND 1 / 20",
+	_round_label = _label(root, Rect2(530, 26, 220, 18), "ROUND 1 / 20",
 			HORIZONTAL_ALIGNMENT_CENTER)
 
 	_unit_label = _label(root, Rect2(908, 6, 364, 200), "")
@@ -65,8 +69,8 @@ func set_phase(player_turn: bool) -> void:
 func set_round(n: int) -> void:
 	_round_label.text = "ROUND %d / 20" % n
 
-func set_field_patch_visible(show: bool) -> void:
-	_field_patch_btn.visible = show
+func set_field_patch_visible(show_btn: bool) -> void:
+	_field_patch_btn.visible = show_btn
 
 func show_unit(unit: Unit) -> void:
 	if unit == null:

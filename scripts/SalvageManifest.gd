@@ -50,4 +50,4 @@ func _row(parent: Control, text: String) -> void:
 	parent.add_child(lbl)
 
 func _on_begin() -> void:
-	get_tree().change_scene_to_file("res://scenes/Main.tscn")
+	get_node("/root/SceneTransition").change_to("res://scenes/Main.tscn")

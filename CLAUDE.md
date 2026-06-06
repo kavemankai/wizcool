@@ -72,9 +72,9 @@ var is_selected: bool
 - **Phase 5:** ✅ Environmental hazards — warning system, pressure dump activation
 - **Phase 6:** ✅ The Rival — Vanguard faction, Rival Rank persistence
 - **Phase 7:** ✅ Mission loop — SalvageManifest screen, extraction tile (5,2), failure states, MissionResult screen, MissionState autoload
-- **Phase 8 (current):** Terminal Hub — repair, fence, contract select, credit economy
-- Phase 9: "Containment Breach" — full hand-authored prototype mission
-- Phase 10: Polish & feel — terminal aesthetic, audio, animation
+- **Phase 8:** ✅ Terminal Hub — repair, fence, contract select, credit economy; SaveData JSON persistence for credits + crew_gear; SceneTransition autoload for fade transitions
+- **Phase 9:** ✅ "Containment Breach" — full hand-authored prototype mission; Zone A/B/C layout with dividers; enemy archetypes placed; extraction objective HUD log; DANGER_PAY=150 on success
+- **Phase 10:** ✅ Polish & feel — pulsing extraction tile, mission label in HUD, round counter, SceneTransition fade-in on scene load, full loop SalvageManifest→Main→MissionResult→TerminalHub
 
 ## Zone Layout (Containment Breach prototype)
 

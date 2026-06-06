@@ -4,7 +4,8 @@ enum GamePhase { PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 enum InputState { IDLE, ACTING }
 
 const ROUND_LIMIT: int = 20
-const EXTRACTION_POS := Vector2i(5, 2)   # Zone C — Evidence Locker
+const EXTRACTION_POS := Vector2i(5, 2)
+const DANGER_PAY := 150
 
 var units: Array[Unit] = []
 var game_phase: GamePhase = GamePhase.PLAYER_TURN
@@ -15,6 +16,9 @@ var round_number: int = 1
 var dropped_loot: Array[GearItem] = []
 var rival_rank: int = 1
 var hazard_manager: HazardManager = null
+
+# unit_id → {is_leader: bool, gear: [{item_id, slot, state: "INTACT"|"FRACTURED"|"BROKEN"}]}
+var _gear_archive: Dictionary = {}
 
 @onready var grid_manager: GridManager = $GridManager
 @onready var unit_layer: Node2D = $UnitLayer
@@ -35,6 +39,8 @@ func _ready() -> void:
 	grid_manager.set_extraction_tile(GridPos.new(EXTRACTION_POS.x, EXTRACTION_POS.y))
 	_spawn_units()
 	hud.set_round(round_number)
+	hud.log("[CONTAINMENT BREACH INITIATED]")
+	hud.log("OBJECTIVE: Move ALPHA to Evidence Locker — Zone C [col 5, row 2]")
 	hud.log("[ROUND 1 — PLAYER TURN]")
 
 # ---------------------------------------------------------------------------
@@ -42,22 +48,28 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 func _spawn_units() -> void:
-	# --- Player crew — Zone A (rows 14–18, bottom) ---
+	var saved_gear := SaveData.load_crew_gear()
+
 	var alpha := _make_unit("ALPHA", true, true, 6, 2, 3, 4)
 	alpha.gear.append(GearItem.make_weapon("PLASMA-CUTTER", 2, 3))
 	alpha.gear.append(GearItem.make_medical_kit("FIELD-PATCH-KIT"))
 	_place(alpha, GridPos.new(5, 17))
+	_apply_saved_gear(alpha, saved_gear)
+	_archive_unit(alpha)
 
 	var bravo := _make_unit("BRAVO", true, false, 5, 2, 4, 2)
 	bravo.gear.append(GearItem.make_weapon("IMPACT-WRENCH", 1, 2))
 	bravo.gear.append(GearItem.make_armor("WORK-HARNESS", 1))
 	_place(bravo, GridPos.new(3, 16))
+	_apply_saved_gear(bravo, saved_gear)
+	_archive_unit(bravo)
 
 	var charlie := _make_unit("CHARLIE", true, false, 4, 3, 3, 5)
 	charlie.gear.append(GearItem.make_weapon("LONG-BORE-DRILL", 1, 2))
 	_place(charlie, GridPos.new(7, 16))
+	_apply_saved_gear(charlie, saved_gear)
+	_archive_unit(charlie)
 
-	# --- Security Bots — Zone B (rows 8–12), Guardian archetype ---
 	var s1 := _make_unit("SENTINEL-1", false, false, 4, 2, 2, 2)
 	s1.archetype = Unit.Archetype.GUARDIAN
 	s1.zone_min_row = 8
@@ -72,7 +84,6 @@ func _spawn_units() -> void:
 	s2.patrol_path = [GridPos.new(8, 8), GridPos.new(8, 11)]
 	_place(s2, GridPos.new(8, 8))
 
-	# --- Feral Prisoners — Zone A/B boundary, Rampaging archetype ---
 	var p1 := _make_unit("PRISONER-1", false, false, 3, 2, 4, 1)
 	p1.archetype = Unit.Archetype.RAMPAGING
 	_place(p1, GridPos.new(4, 14))
@@ -81,7 +92,6 @@ func _spawn_units() -> void:
 	p2.archetype = Unit.Archetype.RAMPAGING
 	_place(p2, GridPos.new(7, 14))
 
-	# --- Vanguard — rank-based spawn ---
 	_spawn_vanguard()
 
 func _spawn_vanguard() -> void:
@@ -133,6 +143,60 @@ func _make_unit(id: String, player: bool, leader: bool,
 
 func _place(unit: Unit, pos: GridPos) -> void:
 	unit.place_at(pos, grid_manager)
+
+# ---------------------------------------------------------------------------
+# Gear archive helpers
+# ---------------------------------------------------------------------------
+
+func _archive_unit(unit: Unit) -> void:
+	var gear_data: Array = []
+	for item: GearItem in unit.gear:
+		gear_data.append({"item_id": item.item_id, "slot": item.slot, "state": _state_str(item.state)})
+	_gear_archive[unit.unit_id] = {"is_leader": unit.is_leader, "gear": gear_data}
+
+func _apply_saved_gear(unit: Unit, saved: Array) -> void:
+	for entry in saved:
+		if entry.get("unit_id", "") == unit.unit_id:
+			for gear_data in entry.get("gear", []):
+				for item: GearItem in unit.gear:
+					if item.item_id == gear_data.get("item_id", ""):
+						item.state = _state_from_str(gear_data.get("state", "INTACT"))
+						break
+			break
+
+func _state_str(state: int) -> String:
+	match state:
+		GearItem.GearState.FRACTURED: return "FRACTURED"
+		GearItem.GearState.BROKEN:    return "BROKEN"
+	return "INTACT"
+
+func _state_from_str(s: String) -> int:
+	match s:
+		"FRACTURED": return GearItem.GearState.FRACTURED
+		"BROKEN":    return GearItem.GearState.BROKEN
+	return GearItem.GearState.INTACT
+
+func _build_crew_snapshot() -> Array:
+	var snap: Array = []
+	for unit_id: String in _gear_archive:
+		var entry: Dictionary = _gear_archive[unit_id]
+		snap.append({
+			"unit_id": unit_id,
+			"is_leader": entry.get("is_leader", false),
+			"gear": entry.get("gear", []).duplicate()
+		})
+	return snap
+
+func _save_crew_gear_to_disk() -> void:
+	var data: Array = []
+	for unit_id: String in _gear_archive:
+		var entry: Dictionary = _gear_archive[unit_id]
+		data.append({
+			"unit_id": unit_id,
+			"is_leader": entry.get("is_leader", false),
+			"gear": entry.get("gear", [])
+		})
+	SaveData.save_crew_gear(data)
 
 # ---------------------------------------------------------------------------
 # Input
@@ -236,7 +300,7 @@ func _is_move_tile(pos: GridPos) -> bool:
 	return false
 
 # ---------------------------------------------------------------------------
-# Combat (player side)
+# Combat
 # ---------------------------------------------------------------------------
 
 func _can_attack(attacker: Unit, target: Unit) -> bool:
@@ -253,7 +317,7 @@ func _do_move(unit: Unit, pos: GridPos) -> void:
 	unit.has_moved = true
 	hud.log("%s → [%d,%d]" % [unit.unit_id, pos.x, pos.y])
 	if unit.is_leader and pos.x == EXTRACTION_POS.x and pos.y == EXTRACTION_POS.y:
-		hud.log("=== LEADER REACHES EVIDENCE LOCKER — EXTRACTING ===")
+		hud.log("=== EVIDENCE SECURED — EXTRACTION SUCCESSFUL ===")
 		_on_mission_success()
 
 func _do_attack(attacker: Unit, target: Unit) -> void:
@@ -287,7 +351,7 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 			_check_game_over()
 
 # ---------------------------------------------------------------------------
-# Field Patch action
+# Field Patch
 # ---------------------------------------------------------------------------
 
 func _can_field_patch(unit: Unit) -> bool:
@@ -332,8 +396,8 @@ func _on_field_patch() -> void:
 	active_unit.gear.remove_at(kit_index)
 	active_unit.has_attacked = true
 	active_unit.queue_redraw()
-	hud.log("%s FIELD-PATCHES %s [+%d MOD RESTORED]" % [
-		active_unit.unit_id, target_item.item_id, target_item.modifier / 2])
+	hud.log("%s FIELD-PATCHES %s [MODIFIER PARTIALLY RESTORED]" % [
+		active_unit.unit_id, target_item.item_id])
 	_refresh_highlights()
 	hud.set_field_patch_visible(false)
 	if not active_unit.can_act():
@@ -354,7 +418,6 @@ func _run_enemy_phase() -> void:
 	hud.set_phase(false)
 	hud.log("--- ENEMY PHASE ---")
 
-	# Build ordered queue: Guardian → Rampaging → Tactical
 	var queue: Array[Unit] = []
 	for archetype_val in [Unit.Archetype.GUARDIAN, Unit.Archetype.RAMPAGING, Unit.Archetype.TACTICAL]:
 		for u in units:
@@ -385,7 +448,6 @@ func _run_enemy_phase() -> void:
 	if game_phase == GamePhase.GAME_OVER:
 		return
 
-	# Apply hazard damage to any unit on warning tiles
 	var warned := grid_manager.get_warning_tiles()
 	if warned.size() > 0:
 		for u: Unit in units.duplicate():
@@ -428,7 +490,6 @@ func _run_enemy_phase() -> void:
 			u.has_attacked = false
 			u.queue_redraw()
 
-	# Set warning tiles for the new round if a hazard is incoming
 	var next_zone := hazard_manager.get_active_zone(round_number)
 	if next_zone.size() > 0:
 		grid_manager.set_warning_tiles(next_zone)
@@ -439,7 +500,6 @@ func _run_enemy_phase() -> void:
 	hud.set_round(round_number)
 	hud.log("--- ROUND %d — PLAYER TURN ---" % round_number)
 
-# Remove units flagged as downed; collect loot from downed Vanguard units.
 # Returns true if the player leader was among those flushed.
 func _flush_downed() -> bool:
 	var leader_fell := false
@@ -450,7 +510,9 @@ func _flush_downed() -> bool:
 			if u.is_player and u.is_leader:
 				leader_fell = true
 	for u in to_remove:
-		if u.archetype == Unit.Archetype.TACTICAL:
+		if u.is_player:
+			_archive_unit(u)
+		elif u.archetype == Unit.Archetype.TACTICAL:
 			for item: GearItem in u.gear:
 				if item.state == GearItem.GearState.BROKEN:
 					dropped_loot.append(item)
@@ -473,7 +535,7 @@ func _check_game_over() -> void:
 			enemies_up += 1
 
 	if enemies_up == 0:
-		hud.log("=== AREA CLEAR — MISSION COMPLETE ===")
+		hud.log("=== AREA CLEAR — CONTAINMENT BREACH COMPLETE ===")
 		_on_mission_success()
 	elif players_up == 0:
 		hud.log("=== ALL CREW DOWN — MISSION FAILED ===")
@@ -485,25 +547,43 @@ func _check_game_over() -> void:
 
 func _on_mission_success() -> void:
 	game_phase = GamePhase.GAME_OVER
+	for u in _get_player_units():
+		_archive_unit(u)
+	_save_crew_gear_to_disk()
+	SaveData.save_credits(SaveData.load_credits() + DANGER_PAY)
 	var ms: MissionState = get_node("/root/MissionState")
-	ms.record_result(true, "", _get_player_units(), dropped_loot, rival_rank)
-	await get_tree().create_timer(2.0).timeout
-	get_tree().change_scene_to_file("res://scenes/MissionResult.tscn")
+	ms.record_result(true, "", _build_crew_snapshot(), dropped_loot, rival_rank, DANGER_PAY)
+	await get_tree().create_timer(1.5).timeout
+	get_node("/root/SceneTransition").change_to("res://scenes/MissionResult.tscn")
 
 func _on_mission_fail(reason: String) -> void:
 	game_phase = GamePhase.GAME_OVER
 	rival_rank += 1
 	SaveData.save_rival_rank(rival_rank)
 	hud.log("VANGUARD RANK NOW %d" % rival_rank)
-	for u in units:
-		if u.is_player:
-			for item: GearItem in u.gear:
-				if item.state == GearItem.GearState.INTACT:
-					item.state = GearItem.GearState.FRACTURED
+
+	# Fracture living crew gear then archive
+	for u in _get_player_units():
+		for item: GearItem in u.gear:
+			if item.state == GearItem.GearState.INTACT:
+				item.state = GearItem.GearState.FRACTURED
+		_archive_unit(u)
+
+	# Fracture any INTACT items still in archive (from previously downed crew)
+	for unit_id: String in _gear_archive:
+		for item_data: Dictionary in _gear_archive[unit_id]["gear"]:
+			if item_data.get("state", "INTACT") == "INTACT":
+				item_data["state"] = "FRACTURED"
+
+	_save_crew_gear_to_disk()
 	var ms: MissionState = get_node("/root/MissionState")
-	ms.record_result(false, reason, _get_player_units(), dropped_loot, rival_rank)
-	await get_tree().create_timer(2.0).timeout
-	get_tree().change_scene_to_file("res://scenes/MissionResult.tscn")
+	ms.record_result(false, reason, _build_crew_snapshot(), dropped_loot, rival_rank, 0)
+	await get_tree().create_timer(1.5).timeout
+	get_node("/root/SceneTransition").change_to("res://scenes/MissionResult.tscn")
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 func _get_player_units() -> Array:
 	var result: Array = []
@@ -511,10 +591,6 @@ func _get_player_units() -> Array:
 		if u.is_player:
 			result.append(u)
 	return result
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 func _unit_at_screen(screen_pos: Vector2) -> Unit:
 	for u in units:

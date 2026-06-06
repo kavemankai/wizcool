@@ -24,11 +24,17 @@ var _move_highlights: Array[GridPos] = []
 var _attack_highlights: Array[GridPos] = []
 var _warning_tiles: Array[GridPos] = []
 var _extraction_tile: GridPos = null
+var _extract_time: float = 0.0
 
 func _ready() -> void:
 	_init_tiles()
 	_place_prototype_layout()
 	queue_redraw()
+
+func _process(delta: float) -> void:
+	if _extraction_tile != null:
+		_extract_time += delta
+		queue_redraw()
 
 func _init_tiles() -> void:
 	tiles.resize(GRID_WIDTH)
@@ -98,9 +104,12 @@ func _draw() -> void:
 		draw_rect(Rect2(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE), WARNING_HIGHLIGHT)
 
 	if _extraction_tile != null:
+		var pulse := sin(_extract_time * 2.8) * 0.18 + 0.48
+		var ecol := EXTRACT_HIGHLIGHT
+		ecol.a = pulse
 		draw_rect(
 			Rect2(_extraction_tile.x * TILE_SIZE, _extraction_tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE),
-			EXTRACT_HIGHLIGHT
+			ecol
 		)
 
 func get_tile_type(pos: GridPos) -> int:
