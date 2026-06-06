@@ -3,6 +3,9 @@ extends Node2D
 enum GamePhase { PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 enum InputState { IDLE, ACTING }
 
+const ROUND_LIMIT: int = 20
+const EXTRACTION_POS := Vector2i(5, 2)   # Zone C — Evidence Locker
+
 var units: Array[Unit] = []
 var game_phase: GamePhase = GamePhase.PLAYER_TURN
 var input_state: InputState = InputState.IDLE
@@ -29,7 +32,9 @@ func _ready() -> void:
 	hud.field_patch_pressed.connect(_on_field_patch)
 	hazard_manager = HazardManager.new()
 	rival_rank = SaveData.load_rival_rank()
+	grid_manager.set_extraction_tile(GridPos.new(EXTRACTION_POS.x, EXTRACTION_POS.y))
 	_spawn_units()
+	hud.set_round(round_number)
 	hud.log("[ROUND 1 — PLAYER TURN]")
 
 # ---------------------------------------------------------------------------
@@ -166,6 +171,9 @@ func _handle_click(click_pos: Vector2) -> void:
 					hud.log("OUT OF RANGE")
 			elif not active_unit.has_moved and _is_move_tile(clicked_grid):
 				_do_move(active_unit, clicked_grid)
+				if game_phase == GamePhase.GAME_OVER:
+					_enter_idle()
+					return
 				_refresh_highlights()
 				if not active_unit.can_act():
 					_enter_idle()
@@ -244,6 +252,9 @@ func _do_move(unit: Unit, pos: GridPos) -> void:
 	unit.place_at(pos, grid_manager)
 	unit.has_moved = true
 	hud.log("%s → [%d,%d]" % [unit.unit_id, pos.x, pos.y])
+	if unit.is_leader and pos.x == EXTRACTION_POS.x and pos.y == EXTRACTION_POS.y:
+		hud.log("=== LEADER REACHES EVIDENCE LOCKER — EXTRACTING ===")
+		_on_mission_success()
 
 func _do_attack(attacker: Unit, target: Unit) -> void:
 	var dmg := attacker.get_weapon_damage()
@@ -268,8 +279,12 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 			hud.log("%s → %s  -%d TGH — DOWNED" % [
 				attacker.unit_id, target.unit_id, dmg])
 	if target.is_downed:
-		_flush_downed()
-		_check_game_over()
+		var leader_fell := _flush_downed()
+		if leader_fell:
+			hud.log("=== LEADER DOWN — MISSION FAILED ===")
+			_on_mission_fail("LEADER DOWNED")
+		else:
+			_check_game_over()
 
 # ---------------------------------------------------------------------------
 # Field Patch action
@@ -358,8 +373,14 @@ func _run_enemy_phase() -> void:
 		for line in lines:
 			hud.log(line)
 
-		_flush_downed()
+		var leader_fell := _flush_downed()
+		if leader_fell:
+			hud.log("=== LEADER DOWN — MISSION FAILED ===")
+			_on_mission_fail("LEADER DOWNED")
+			return
 		_check_game_over()
+		if game_phase == GamePhase.GAME_OVER:
+			return
 
 	if game_phase == GamePhase.GAME_OVER:
 		return
@@ -384,7 +405,11 @@ func _run_enemy_phase() -> void:
 							hud.log("[HAZARD] %s DOWNED" % u.unit_id)
 					break
 		grid_manager.clear_warning_tiles()
-		_flush_downed()
+		var leader_fell2 := _flush_downed()
+		if leader_fell2:
+			hud.log("=== LEADER DOWN — MISSION FAILED ===")
+			_on_mission_fail("LEADER DOWNED")
+			return
 		_check_game_over()
 		if game_phase == GamePhase.GAME_OVER:
 			return
@@ -392,6 +417,11 @@ func _run_enemy_phase() -> void:
 	await get_tree().create_timer(0.4).timeout
 
 	round_number += 1
+	if round_number > ROUND_LIMIT:
+		hud.log("=== ROUND LIMIT REACHED — MISSION FAILED ===")
+		_on_mission_fail("ROUND LIMIT EXPIRED")
+		return
+
 	for u in units:
 		if not u.is_downed:
 			u.has_moved = false
@@ -406,14 +436,19 @@ func _run_enemy_phase() -> void:
 
 	game_phase = GamePhase.PLAYER_TURN
 	hud.set_phase(true)
+	hud.set_round(round_number)
 	hud.log("--- ROUND %d — PLAYER TURN ---" % round_number)
 
 # Remove units flagged as downed; collect loot from downed Vanguard units.
-func _flush_downed() -> void:
+# Returns true if the player leader was among those flushed.
+func _flush_downed() -> bool:
+	var leader_fell := false
 	var to_remove: Array[Unit] = []
 	for u in units:
 		if u.is_downed:
 			to_remove.append(u)
+			if u.is_player and u.is_leader:
+				leader_fell = true
 	for u in to_remove:
 		if u.archetype == Unit.Archetype.TACTICAL:
 			for item: GearItem in u.gear:
@@ -422,6 +457,7 @@ func _flush_downed() -> void:
 					hud.log("[LOOT] %s DROPPED" % item.item_id)
 		units.erase(u)
 		u.queue_free()
+	return leader_fell
 
 # ---------------------------------------------------------------------------
 # Game-over detection
@@ -437,14 +473,44 @@ func _check_game_over() -> void:
 			enemies_up += 1
 
 	if enemies_up == 0:
-		hud.log("=== AREA CLEAR ===")
-		game_phase = GamePhase.GAME_OVER
+		hud.log("=== AREA CLEAR — MISSION COMPLETE ===")
+		_on_mission_success()
 	elif players_up == 0:
 		hud.log("=== ALL CREW DOWN — MISSION FAILED ===")
-		rival_rank += 1
-		SaveData.save_rival_rank(rival_rank)
-		hud.log("VANGUARD RANK NOW %d" % rival_rank)
-		game_phase = GamePhase.GAME_OVER
+		_on_mission_fail("ALL CREW DOWN")
+
+# ---------------------------------------------------------------------------
+# Mission outcome
+# ---------------------------------------------------------------------------
+
+func _on_mission_success() -> void:
+	game_phase = GamePhase.GAME_OVER
+	var ms: MissionState = get_node("/root/MissionState")
+	ms.record_result(true, "", _get_player_units(), dropped_loot, rival_rank)
+	await get_tree().create_timer(2.0).timeout
+	get_tree().change_scene_to_file("res://scenes/MissionResult.tscn")
+
+func _on_mission_fail(reason: String) -> void:
+	game_phase = GamePhase.GAME_OVER
+	rival_rank += 1
+	SaveData.save_rival_rank(rival_rank)
+	hud.log("VANGUARD RANK NOW %d" % rival_rank)
+	for u in units:
+		if u.is_player:
+			for item: GearItem in u.gear:
+				if item.state == GearItem.GearState.INTACT:
+					item.state = GearItem.GearState.FRACTURED
+	var ms: MissionState = get_node("/root/MissionState")
+	ms.record_result(false, reason, _get_player_units(), dropped_loot, rival_rank)
+	await get_tree().create_timer(2.0).timeout
+	get_tree().change_scene_to_file("res://scenes/MissionResult.tscn")
+
+func _get_player_units() -> Array:
+	var result: Array = []
+	for u in units:
+		if u.is_player:
+			result.append(u)
+	return result
 
 # ---------------------------------------------------------------------------
 # Helpers

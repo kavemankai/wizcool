@@ -17,11 +17,13 @@ const LINE_COLOR          := Color(0.22, 0.25, 0.30, 0.55)
 const MOVE_HIGHLIGHT      := Color(0.25, 0.60, 0.25, 0.35)
 const ATTACK_HIGHLIGHT    := Color(0.75, 0.18, 0.18, 0.40)
 const WARNING_HIGHLIGHT   := Color(0.90, 0.80, 0.10, 0.45)
+const EXTRACT_HIGHLIGHT   := Color(0.10, 0.80, 0.60, 0.55)
 
 var tiles: Array = []
 var _move_highlights: Array[GridPos] = []
 var _attack_highlights: Array[GridPos] = []
 var _warning_tiles: Array[GridPos] = []
+var _extraction_tile: GridPos = null
 
 func _ready() -> void:
 	_init_tiles()
@@ -95,6 +97,12 @@ func _draw() -> void:
 	for pos in _warning_tiles:
 		draw_rect(Rect2(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE), WARNING_HIGHLIGHT)
 
+	if _extraction_tile != null:
+		draw_rect(
+			Rect2(_extraction_tile.x * TILE_SIZE, _extraction_tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE),
+			EXTRACT_HIGHLIGHT
+		)
+
 func get_tile_type(pos: GridPos) -> int:
 	if not is_in_bounds(pos):
 		return TileType.WALL
@@ -139,6 +147,10 @@ func clear_warning_tiles() -> void:
 
 func get_warning_tiles() -> Array[GridPos]:
 	return _warning_tiles
+
+func set_extraction_tile(pos: GridPos) -> void:
+	_extraction_tile = pos
+	queue_redraw()
 
 func is_hazard_warned(pos: GridPos) -> bool:
 	for p in _warning_tiles:

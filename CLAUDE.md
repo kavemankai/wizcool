@@ -65,14 +65,14 @@ var is_selected: bool
 
 ## Phase Build Order
 
-- **Phase 1 (current):** Grid shell — tiles, camera, unit placement, click-to-select
-- Phase 2: Combat core — turn order, movement, attack, Toughness, LOS
-- Phase 3: Enemy AI — Guardian / Rampaging / Tactical archetypes
-- Phase 4: Fractured gear economy — three-state model, field-patch, Medical slot
-- Phase 5: Environmental hazards — warning system, pressure dump activation
-- Phase 6: The Rival — Vanguard faction, Rival Rank persistence
-- Phase 7: Mission loop — Manifest screen, extraction, failure states
-- Phase 8: Terminal Hub — repair, fence, contract select, credit economy
+- **Phase 1:** ✅ Grid shell — tiles, camera, unit placement, click-to-select
+- **Phase 2:** ✅ Combat core — turn order, movement, attack, Toughness, LOS
+- **Phase 3:** ✅ Enemy AI — Guardian / Rampaging / Tactical archetypes
+- **Phase 4:** ✅ Fractured gear economy — three-state model, field-patch, Medical slot
+- **Phase 5:** ✅ Environmental hazards — warning system, pressure dump activation
+- **Phase 6:** ✅ The Rival — Vanguard faction, Rival Rank persistence
+- **Phase 7:** ✅ Mission loop — SalvageManifest screen, extraction tile (5,2), failure states, MissionResult screen, MissionState autoload
+- **Phase 8 (current):** Terminal Hub — repair, fence, contract select, credit economy
 - Phase 9: "Containment Breach" — full hand-authored prototype mission
 - Phase 10: Polish & feel — terminal aesthetic, audio, animation
 

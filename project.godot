@@ -13,7 +13,11 @@ config_version=5
 config/name="Fringe Ledger"
 config/features=PackedStringArray("4.4")
 config/icon="res://icon.svg"
-config/run/main_scene="res://scenes/Main.tscn"
+config/run/main_scene="res://scenes/SalvageManifest.tscn"
+
+[autoload]
+
+MissionState="*res://scripts/MissionState.gd"
 
 [display]
 

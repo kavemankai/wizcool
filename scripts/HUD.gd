@@ -7,6 +7,7 @@ signal field_patch_pressed
 const MAX_LOG := 8
 
 var _phase_label: Label
+var _round_label: Label
 var _unit_label: Label
 var _log_label: Label
 var _end_turn_btn: Button
@@ -20,7 +21,9 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 
-	_phase_label = _label(root, Rect2(530, 6, 220, 26), "PLAYER TURN",
+	_phase_label = _label(root, Rect2(530, 6, 220, 22), "PLAYER TURN",
+			HORIZONTAL_ALIGNMENT_CENTER)
+	_round_label = _label(root, Rect2(530, 28, 220, 18), "ROUND 1 / 20",
 			HORIZONTAL_ALIGNMENT_CENTER)
 
 	_unit_label = _label(root, Rect2(908, 6, 364, 200), "")
@@ -58,6 +61,9 @@ func _label(parent: Control, rect: Rect2, text: String,
 
 func set_phase(player_turn: bool) -> void:
 	_phase_label.text = "PLAYER TURN" if player_turn else "ENEMY TURN"
+
+func set_round(n: int) -> void:
+	_round_label.text = "ROUND %d / 20" % n
 
 func set_field_patch_visible(show: bool) -> void:
 	_field_patch_btn.visible = show
