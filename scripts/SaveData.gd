@@ -11,7 +11,7 @@ static func load_rival_rank() -> int:
 		return 1
 	var json_str := file.get_as_text()
 	file.close()
-	var parsed := JSON.parse_string(json_str)
+	var parsed: Variant = JSON.parse_string(json_str)
 	if parsed == null or not parsed is Dictionary:
 		return 1
 	return int(parsed.get("rival_rank", 1))

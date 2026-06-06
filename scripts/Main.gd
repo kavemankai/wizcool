@@ -140,8 +140,8 @@ func _input(event: InputEvent) -> void:
 		_handle_click(event.global_position)
 
 func _handle_click(click_pos: Vector2) -> void:
-	var clicked_unit := _unit_at_screen(click_pos)
-	var clicked_grid := grid_manager.world_to_grid(click_pos)
+	var clicked_unit: Unit = _unit_at_screen(click_pos)
+	var clicked_grid: GridPos = grid_manager.world_to_grid(click_pos)
 
 	match input_state:
 		InputState.IDLE:
@@ -234,9 +234,9 @@ func _is_move_tile(pos: GridPos) -> bool:
 func _can_attack(attacker: Unit, target: Unit) -> bool:
 	if target.is_downed:
 		return false
-	var dx := abs(attacker.grid_pos.x - target.grid_pos.x)
-	var dy := abs(attacker.grid_pos.y - target.grid_pos.y)
-	if max(dx, dy) > attacker.attack_range:
+	var dx: int = absi(attacker.grid_pos.x - target.grid_pos.x)
+	var dy: int = absi(attacker.grid_pos.y - target.grid_pos.y)
+	if maxi(dx, dy) > attacker.attack_range:
 		return false
 	return LOS.has_los(attacker.grid_pos, target.grid_pos, grid_manager)
 
@@ -367,7 +367,7 @@ func _run_enemy_phase() -> void:
 	# Apply hazard damage to any unit on warning tiles
 	var warned := grid_manager.get_warning_tiles()
 	if warned.size() > 0:
-		for u in units.duplicate():
+		for u: Unit in units.duplicate():
 			if u.is_downed:
 				continue
 			for wp in warned:

@@ -39,43 +39,43 @@ func _init_tiles() -> void:
 func _place_prototype_layout() -> void:
 	# Outer perimeter walls
 	for x in GRID_WIDTH:
-		_set(x, 0, TileType.WALL)
-		_set(x, GRID_HEIGHT - 1, TileType.WALL)
+		_set_tile(x, 0, TileType.WALL)
+		_set_tile(x, GRID_HEIGHT - 1, TileType.WALL)
 	for y in GRID_HEIGHT:
-		_set(0, y, TileType.WALL)
-		_set(GRID_WIDTH - 1, y, TileType.WALL)
+		_set_tile(0, y, TileType.WALL)
+		_set_tile(GRID_WIDTH - 1, y, TileType.WALL)
 
 	# Zone C / Zone B divider at row 7 — corridor openings at col 4 and 8
 	for x in GRID_WIDTH:
 		if x != 4 and x != 8:
-			_set(x, 7, TileType.WALL)
+			_set_tile(x, 7, TileType.WALL)
 
 	# Zone B / Zone A divider at row 13 — corridor openings at col 3 and 9
 	for x in GRID_WIDTH:
 		if x != 3 and x != 9:
-			_set(x, 13, TileType.WALL)
+			_set_tile(x, 13, TileType.WALL)
 
 	# Zone C cover (rows 1–6) — evidence locker area
-	_set(3, 3, TileType.COVER)
-	_set(8, 3, TileType.COVER)
-	_set(2, 5, TileType.COVER)
-	_set(9, 5, TileType.COVER)
+	_set_tile(3, 3, TileType.COVER)
+	_set_tile(8, 3, TileType.COVER)
+	_set_tile(2, 5, TileType.COVER)
+	_set_tile(9, 5, TileType.COVER)
 
 	# Zone B cover + internal walls (rows 8–12) — narrow corridors
-	_set(3, 9,  TileType.COVER)
-	_set(8, 9,  TileType.COVER)
-	_set(5, 10, TileType.COVER)
-	_set(6, 10, TileType.COVER)
-	_set(2, 11, TileType.WALL)
-	_set(9, 11, TileType.WALL)
+	_set_tile(3, 9,  TileType.COVER)
+	_set_tile(8, 9,  TileType.COVER)
+	_set_tile(5, 10, TileType.COVER)
+	_set_tile(6, 10, TileType.COVER)
+	_set_tile(2, 11, TileType.WALL)
+	_set_tile(9, 11, TileType.WALL)
 
 	# Zone A cover (rows 14–18) — player entry
-	_set(3, 16, TileType.COVER)
-	_set(8, 16, TileType.COVER)
-	_set(5, 15, TileType.COVER)
-	_set(6, 15, TileType.COVER)
+	_set_tile(3, 16, TileType.COVER)
+	_set_tile(8, 16, TileType.COVER)
+	_set_tile(5, 15, TileType.COVER)
+	_set_tile(6, 15, TileType.COVER)
 
-func _set(x: int, y: int, type: int) -> void:
+func _set_tile(x: int, y: int, type: int) -> void:
 	if x >= 0 and x < GRID_WIDTH and y >= 0 and y < GRID_HEIGHT:
 		tiles[x][y] = type
 

@@ -15,7 +15,7 @@ static func has_los(from_pos: GridPos, to_pos: GridPos, grid: GridManager) -> bo
 
 	var dx := x1 - x0
 	var dy := y1 - y0
-	var steps := max(abs(dx), abs(dy))
+	var steps: int = maxi(absi(dx), absi(dy))
 
 	for i in range(1, steps):
 		var t := float(i) / float(steps)
