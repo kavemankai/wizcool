@@ -8,16 +8,17 @@ const TILE_SIZE: int = 32
 enum TileType { FLOOR, WALL, COVER }
 
 const TILE_COLORS: Dictionary = {
-	0: Color(0.10, 0.11, 0.13),
-	1: Color(0.04, 0.04, 0.06),
-	2: Color(0.20, 0.15, 0.10),
+	0: Color(0.10, 0.11, 0.13),   # FLOOR
+	1: Color(0.04, 0.04, 0.06),   # WALL
+	2: Color(0.20, 0.15, 0.10),   # COVER
 }
-const LINE_COLOR := Color(0.22, 0.25, 0.30, 0.55)
-const HIGHLIGHT_COLOR := Color(0.30, 0.60, 0.30, 0.35)
-const ZONE_LABEL_COLOR := Color(0.50, 0.45, 0.30, 0.40)
+const LINE_COLOR          := Color(0.22, 0.25, 0.30, 0.55)
+const MOVE_HIGHLIGHT      := Color(0.25, 0.60, 0.25, 0.35)
+const ATTACK_HIGHLIGHT    := Color(0.75, 0.18, 0.18, 0.40)
 
 var tiles: Array = []
-var _highlights: Array[GridPos] = []
+var _move_highlights: Array[GridPos] = []
+var _attack_highlights: Array[GridPos] = []
 
 func _ready() -> void:
 	_init_tiles()
@@ -33,7 +34,7 @@ func _init_tiles() -> void:
 			tiles[x][y] = TileType.FLOOR
 
 func _place_prototype_layout() -> void:
-	# Outer walls
+	# Outer perimeter walls
 	for x in GRID_WIDTH:
 		_set(x, 0, TileType.WALL)
 		_set(x, GRID_HEIGHT - 1, TileType.WALL)
@@ -41,31 +42,31 @@ func _place_prototype_layout() -> void:
 		_set(0, y, TileType.WALL)
 		_set(GRID_WIDTH - 1, y, TileType.WALL)
 
-	# Zone A/B divider at row 7 — gaps at col 4 and col 8 (corridor openings)
+	# Zone C / Zone B divider at row 7 — corridor openings at col 4 and 8
 	for x in GRID_WIDTH:
 		if x != 4 and x != 8:
 			_set(x, 7, TileType.WALL)
 
-	# Zone B/C divider at row 13 — gaps at col 3 and col 9
+	# Zone B / Zone A divider at row 13 — corridor openings at col 3 and 9
 	for x in GRID_WIDTH:
 		if x != 3 and x != 9:
 			_set(x, 13, TileType.WALL)
 
-	# Zone A cover
+	# Zone C cover (rows 1–6) — evidence locker area
 	_set(3, 3, TileType.COVER)
 	_set(8, 3, TileType.COVER)
 	_set(2, 5, TileType.COVER)
 	_set(9, 5, TileType.COVER)
 
-	# Zone B cover / cell doors
-	_set(3, 9, TileType.COVER)
-	_set(8, 9, TileType.COVER)
+	# Zone B cover + internal walls (rows 8–12) — narrow corridors
+	_set(3, 9,  TileType.COVER)
+	_set(8, 9,  TileType.COVER)
 	_set(5, 10, TileType.COVER)
 	_set(6, 10, TileType.COVER)
 	_set(2, 11, TileType.WALL)
 	_set(9, 11, TileType.WALL)
 
-	# Zone C cover
+	# Zone A cover (rows 14–18) — player entry
 	_set(3, 16, TileType.COVER)
 	_set(8, 16, TileType.COVER)
 	_set(5, 15, TileType.COVER)
@@ -82,9 +83,11 @@ func _draw() -> void:
 			draw_rect(rect, TILE_COLORS[tiles[x][y]])
 			draw_rect(rect, LINE_COLOR, false, 0.5)
 
-	for pos in _highlights:
-		var rect := Rect2(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-		draw_rect(rect, HIGHLIGHT_COLOR)
+	for pos in _move_highlights:
+		draw_rect(Rect2(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE), MOVE_HIGHLIGHT)
+
+	for pos in _attack_highlights:
+		draw_rect(Rect2(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE), ATTACK_HIGHLIGHT)
 
 func get_tile_type(pos: GridPos) -> int:
 	if not is_in_bounds(pos):
@@ -107,10 +110,15 @@ func grid_to_world_center(pos: GridPos) -> Vector2:
 		pos.y * TILE_SIZE + TILE_SIZE * 0.5
 	))
 
-func set_highlights(positions: Array[GridPos]) -> void:
-	_highlights = positions
+func set_move_highlights(positions: Array[GridPos]) -> void:
+	_move_highlights = positions
 	queue_redraw()
 
-func clear_highlights() -> void:
-	_highlights = []
+func set_attack_highlights(positions: Array[GridPos]) -> void:
+	_attack_highlights = positions
+	queue_redraw()
+
+func clear_all_highlights() -> void:
+	_move_highlights = []
+	_attack_highlights = []
 	queue_redraw()
