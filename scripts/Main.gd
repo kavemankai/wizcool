@@ -156,6 +156,9 @@ func _handle_click(click_pos: Vector2) -> void:
 			elif clicked_unit != null and not clicked_unit.is_player and not clicked_unit.is_downed:
 				if not active_unit.has_attacked and _can_attack(active_unit, clicked_unit):
 					_do_attack(active_unit, clicked_unit)
+					if game_phase == GamePhase.GAME_OVER:
+						_enter_idle()
+						return
 					_refresh_highlights()
 					if not active_unit.can_act():
 						_enter_idle()
@@ -259,10 +262,10 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 		Unit.DamageResult.GEAR_BROKEN:
 			var item := _find_gear_by_state(target, GearItem.GearState.BROKEN)
 			var slot_name := item.slot.to_upper() if item else "GEAR"
-			hud.log("%s → %s  %s BROKEN" % [
+			hud.log("%s → %s  %s BROKEN — DOWNED" % [
 				attacker.unit_id, target.unit_id, slot_name])
 		Unit.DamageResult.DOWNED:
-			hud.log("%s → %s  -%d TGH" % [
+			hud.log("%s → %s  -%d TGH — DOWNED" % [
 				attacker.unit_id, target.unit_id, dmg])
 	if target.is_downed:
 		_flush_downed()
@@ -343,7 +346,7 @@ func _run_enemy_phase() -> void:
 	for enemy in queue:
 		if game_phase == GamePhase.GAME_OVER:
 			return
-		if enemy.is_downed:
+		if not is_instance_valid(enemy) or enemy.is_downed:
 			continue
 
 		await get_tree().create_timer(0.3).timeout
@@ -409,7 +412,6 @@ func _flush_downed() -> void:
 		if u.is_downed:
 			to_remove.append(u)
 	for u in to_remove:
-		hud.log("%s DOWNED" % u.unit_id)
 		if u.archetype == Unit.Archetype.TACTICAL:
 			for item: GearItem in u.gear:
 				if item.state == GearItem.GearState.BROKEN:

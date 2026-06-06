@@ -25,4 +25,5 @@ func get_active_zone(round_num: int) -> Array[GridPos]:
 	if round_num % HAZARD_INTERVAL != 0:
 		return []
 	var cycle_index := ((round_num / HAZARD_INTERVAL) - 1) % 3
-	return _zones[cycle_index]
+	var zone: Array[GridPos] = _zones[cycle_index]
+	return zone

@@ -11,6 +11,7 @@ const TILE_COLORS: Dictionary = {
 	0: Color(0.10, 0.11, 0.13),   # FLOOR
 	1: Color(0.04, 0.04, 0.06),   # WALL
 	2: Color(0.20, 0.15, 0.10),   # COVER
+	3: Color(0.18, 0.18, 0.08),   # HAZARD_ZONE
 }
 const LINE_COLOR          := Color(0.22, 0.25, 0.30, 0.55)
 const MOVE_HIGHLIGHT      := Color(0.25, 0.60, 0.25, 0.35)
