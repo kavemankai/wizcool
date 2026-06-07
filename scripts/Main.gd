@@ -16,6 +16,7 @@ var round_number: int = 1
 var dropped_loot: Array[GearItem] = []
 var rival_rank: int = 1
 var hazard_manager: HazardSystem = null
+var _skip_requested: bool = false
 
 # unit_id → {is_leader: bool, gear: [{item_id, slot, state: int (GearState enum)}]}
 var _gear_archive: Dictionary = {}
@@ -23,6 +24,7 @@ var _gear_archive: Dictionary = {}
 @onready var grid_manager: GridManager = $GridManager
 @onready var unit_layer: Node2D = $UnitLayer
 @onready var hud: HUD = $HUD
+@onready var cutaway: CombatCutaway = $CombatCutaway
 
 func _ready() -> void:
 	var grid_w := GridManager.GRID_WIDTH * GridManager.TILE_SIZE
@@ -34,6 +36,7 @@ func _ready() -> void:
 	)
 	hud.end_turn_pressed.connect(_on_end_turn)
 	hud.field_patch_pressed.connect(_on_field_patch)
+	hud.skip_pressed.connect(func() -> void: _skip_requested = true)
 	hazard_manager = HazardSystem.new()
 	rival_rank = get_node("/root/GameState").vanguard_rank
 	grid_manager.set_extraction_tile(GridPos.new(EXTRACTION_POS.x, EXTRACTION_POS.y))
@@ -201,6 +204,11 @@ func _handle_click(click_pos: Vector2) -> void:
 	var clicked_unit: Unit = _unit_at_screen(click_pos)
 	var clicked_grid: GridPos = grid_manager.world_to_grid(click_pos)
 
+	if clicked_unit != null and not clicked_unit.is_downed:
+		hud.show_unit(clicked_unit)
+	elif clicked_unit == null and input_state == InputState.IDLE:
+		hud.show_unit(null)
+
 	match input_state:
 		InputState.IDLE:
 			if clicked_unit and clicked_unit.is_player and clicked_unit.can_act():
@@ -213,7 +221,7 @@ func _handle_click(click_pos: Vector2) -> void:
 				_select(clicked_unit)
 			elif clicked_unit != null and not clicked_unit.is_player and not clicked_unit.is_downed:
 				if not active_unit.has_attacked and _can_attack(active_unit, clicked_unit):
-					_do_attack(active_unit, clicked_unit)
+					await _do_attack(active_unit, clicked_unit)
 					if game_phase == GamePhase.GAME_OVER:
 						_enter_idle()
 						return
@@ -311,6 +319,7 @@ func _do_move(unit: Unit, pos: GridPos) -> void:
 
 func _do_attack(attacker: Unit, target: Unit) -> void:
 	var dmg := attacker.get_weapon_damage()
+	var pre_tgh := target.toughness
 	var result := CombatResolver.resolve_damage(target, dmg)
 	attacker.has_attacked = true
 	match result:
@@ -331,6 +340,8 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 		Unit.DamageResult.DOWNED:
 			hud.log("%s → %s  -%d TGH — DOWNED" % [
 				attacker.unit_id, target.unit_id, dmg])
+	cutaway.queue_event(attacker, target, dmg, result, pre_tgh)
+	await cutaway.play_pending()
 	if target.is_downed:
 		var leader_fell := _flush_downed()
 		if leader_fell:
@@ -405,6 +416,8 @@ func _on_end_turn() -> void:
 func _run_enemy_phase() -> void:
 	game_phase = GamePhase.ENEMY_TURN
 	hud.set_phase(false)
+	hud.set_skip_visible(true)
+	_skip_requested = false
 	hud.log("--- ENEMY PHASE ---")
 
 	var queue: Array[Unit] = []
@@ -415,31 +428,55 @@ func _run_enemy_phase() -> void:
 
 	for enemy in queue:
 		if game_phase == GamePhase.GAME_OVER:
-			return
+			break
 		if not is_instance_valid(enemy) or enemy.is_downed:
 			continue
 
-		await get_tree().create_timer(0.3).timeout
+		await get_tree().create_timer(0.0 if _skip_requested else 0.8).timeout
 
+		if game_phase == GamePhase.GAME_OVER:
+			break
+		if not is_instance_valid(enemy) or enemy.is_downed:
+			continue
+
+		enemy.is_acting = true
+		enemy.queue_redraw()
+		hud.show_unit(enemy)
+
+		var cq: Object = null if _skip_requested else cutaway
 		var lines: Array[String] = []
 		match enemy.archetype:
 			Unit.Archetype.GUARDIAN:
-				lines = GuardianAI.take_turn(enemy, units, grid_manager)
+				lines = GuardianAI.take_turn(enemy, units, grid_manager, cq)
 			Unit.Archetype.RAMPAGING:
-				lines = RampagingAI.take_turn(enemy, units, grid_manager)
+				lines = RampagingAI.take_turn(enemy, units, grid_manager, cq)
 			Unit.Archetype.TACTICAL:
-				lines = TacticalAI.take_turn(enemy, units, grid_manager, round_number)
+				lines = TacticalAI.take_turn(enemy, units, grid_manager, round_number, cq)
 		for line in lines:
 			hud.log(line)
+
+		if is_instance_valid(enemy):
+			enemy.is_acting = false
+			enemy.queue_redraw()
+
+		if not _skip_requested and cutaway.has_pending():
+			await cutaway.play_pending()
+		elif cutaway.has_pending():
+			cutaway.clear_pending()
 
 		var leader_fell := _flush_downed()
 		if leader_fell:
 			hud.log("=== LEADER DOWN — MISSION FAILED ===")
+			hud.set_skip_visible(false)
 			_on_mission_fail("LEADER DOWNED")
 			return
 		_check_game_over()
 		if game_phase == GamePhase.GAME_OVER:
-			return
+			break
+
+	hud.set_skip_visible(false)
+	var skip_was_requested := _skip_requested
+	_skip_requested = false
 
 	if game_phase == GamePhase.GAME_OVER:
 		return
@@ -472,7 +509,7 @@ func _run_enemy_phase() -> void:
 		if game_phase == GamePhase.GAME_OVER:
 			return
 
-	await get_tree().create_timer(0.4).timeout
+	await get_tree().create_timer(0.0 if skip_was_requested else 0.4).timeout
 
 	round_number += 1
 	if round_number > ROUND_LIMIT:

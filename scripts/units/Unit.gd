@@ -16,6 +16,7 @@ const LEADER_RING     := Color(0.90, 0.80, 0.10)
 const SELECT_RING     := Color(0.90, 0.90, 0.35)
 const ALERT_RING      := Color(0.95, 0.45, 0.10)
 const ADVANCE_RING    := Color(0.80, 0.10, 0.30)
+const ACTING_RING     := Color(0.95, 0.95, 0.95, 0.85)
 const BAR_BACK        := Color(0.25, 0.08, 0.08)
 const BAR_FILL        := Color(0.15, 0.75, 0.25)
 
@@ -56,6 +57,7 @@ var has_moved: bool = false
 var has_attacked: bool = false
 var is_downed: bool = false
 var is_selected: bool = false
+var is_acting: bool = false
 
 func get_effective_combat_skill() -> int:
 	var total := combat_skill
@@ -198,6 +200,9 @@ func _draw() -> void:
 
 	if is_selected:
 		draw_arc(Vector2.ZERO, RADIUS + 7.0, 0.0, TAU, 32, SELECT_RING, 2.0)
+
+	if is_acting:
+		draw_arc(Vector2.ZERO, RADIUS + 5.5, 0.0, TAU, 24, ACTING_RING, 2.5)
 
 	var bw := RADIUS * 2.2
 	var bx := -bw * 0.5

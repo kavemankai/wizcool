@@ -3,6 +3,7 @@ extends CanvasLayer
 
 signal end_turn_pressed
 signal field_patch_pressed
+signal skip_pressed
 
 const MAX_LOG := 8
 
@@ -13,6 +14,7 @@ var _unit_label: Label
 var _log_label: Label
 var _end_turn_btn: Button
 var _field_patch_btn: Button
+var _skip_btn: Button
 
 var _log_lines: Array[String] = []
 
@@ -51,6 +53,15 @@ func _ready() -> void:
 	_field_patch_btn.pressed.connect(func() -> void: field_patch_pressed.emit())
 	root.add_child(_field_patch_btn)
 
+	_skip_btn = Button.new()
+	_skip_btn.set_position(Vector2(1108, 560))
+	_skip_btn.set_size(Vector2(164, 38))
+	_skip_btn.text = "SKIP ENEMY PHASE"
+	_skip_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_skip_btn.visible = false
+	_skip_btn.pressed.connect(func() -> void: skip_pressed.emit())
+	root.add_child(_skip_btn)
+
 func _label(parent: Control, rect: Rect2, text: String,
 		align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var lbl := Label.new()
@@ -71,6 +82,9 @@ func set_round(n: int) -> void:
 
 func set_field_patch_visible(show_btn: bool) -> void:
 	_field_patch_btn.visible = show_btn
+
+func set_skip_visible(show_btn: bool) -> void:
+	_skip_btn.visible = show_btn
 
 func show_unit(unit: Unit) -> void:
 	if unit == null:

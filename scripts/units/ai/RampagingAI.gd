@@ -4,7 +4,8 @@ extends RefCounted
 # Charge the nearest unit each turn regardless of faction.
 # No zone boundary. Ignores hazard warning tiles by design.
 
-static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager) -> Array[String]:
+static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager,
+		cutaway_queue: Object = null) -> Array[String]:
 	var log: Array[String] = []
 
 	var target := EnemyAI.nearest_unit(unit, all_units)
@@ -32,7 +33,7 @@ static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager) -> 
 
 	# Attack if in range
 	if not unit.has_attacked and EnemyAI.can_attack(unit, target, grid):
-		var result := EnemyAI.do_attack(unit, target)
+		var result := EnemyAI.do_attack(unit, target, cutaway_queue)
 		if result >= 0:
 			var suffix := ""
 			if result == Unit.DamageResult.GEAR_FRACTURED:

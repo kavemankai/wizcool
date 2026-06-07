@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/core/GridManager.gd" id="2_grid"]
 [ext_resource type="Script" path="res://scripts/ui/HUD.gd" id="3_hud"]
+[ext_resource type="Script" path="res://scripts/ui/CombatCutaway.gd" id="4_cutaway"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -17,3 +18,7 @@ position = Vector2(640, 360)
 
 [node name="HUD" type="CanvasLayer" parent="."]
 script = ExtResource("3_hud")
+
+[node name="CombatCutaway" type="CanvasLayer" parent="."]
+layer = 10
+script = ExtResource("4_cutaway")

@@ -6,7 +6,8 @@ extends RefCounted
 # Does not attack Guardian or Rampaging units (faction awareness).
 
 static func take_turn(unit: Unit, all_units: Array[Unit],
-		grid: GridManager, round_num: int = 0) -> Array[String]:
+		grid: GridManager, round_num: int = 0,
+		cutaway_queue: Object = null) -> Array[String]:
 	var log: Array[String] = []
 
 	# Rank 3+: forced advance at round 3 regardless of board state
@@ -23,7 +24,7 @@ static func take_turn(unit: Unit, all_units: Array[Unit],
 		# Hold — still fire if a player walks into range
 		var in_range := _nearest_player_in_range(unit, all_units, grid)
 		if in_range != null:
-			var result := EnemyAI.do_attack(unit, in_range)
+			var result := EnemyAI.do_attack(unit, in_range, cutaway_queue)
 			if result >= 0:
 				log.append("[VANGUARD] %s FIRES  %s  [%d/%d]%s" % [
 					unit.unit_id, in_range.unit_id,
@@ -59,7 +60,7 @@ static func take_turn(unit: Unit, all_units: Array[Unit],
 			attack_target = _nearest_player_in_range(unit, all_units, grid)
 
 		if attack_target != null:
-			var result := EnemyAI.do_attack(unit, attack_target)
+			var result := EnemyAI.do_attack(unit, attack_target, cutaway_queue)
 			if result >= 0:
 				log.append("[VANGUARD] %s → %s  [%d/%d]%s" % [
 					unit.unit_id, attack_target.unit_id,

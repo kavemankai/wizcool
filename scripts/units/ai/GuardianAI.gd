@@ -4,13 +4,14 @@ extends RefCounted
 # Patrol a fixed waypoint loop. Stop and attack when a player enters LOS.
 # Does not pursue or move outside zone_min_row / zone_max_row.
 
-static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager) -> Array[String]:
+static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager,
+		cutaway_queue: Object = null) -> Array[String]:
 	var log: Array[String] = []
 	var visible := _nearest_player_in_los(unit, all_units, grid)
 
 	if visible != null:
 		unit.is_alerted = true
-		_pursue_and_attack(unit, visible, all_units, grid, log)
+		_pursue_and_attack(unit, visible, all_units, grid, log, cutaway_queue)
 	else:
 		unit.is_alerted = false
 		_patrol_step(unit, all_units, grid, log)
@@ -20,7 +21,7 @@ static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager) -> 
 static func _pursue_and_attack(
 		unit: Unit, target: Unit,
 		all_units: Array[Unit], grid: GridManager,
-		log: Array[String]) -> void:
+		log: Array[String], cutaway_queue: Object = null) -> void:
 	var warning := grid.get_warning_tiles()
 	if not unit.has_moved:
 		if not EnemyAI.can_attack(unit, target, grid):
@@ -30,7 +31,7 @@ static func _pursue_and_attack(
 				log.append("%s MOVES → [%d,%d]" % [unit.unit_id, dest.x, dest.y])
 
 	if EnemyAI.can_attack(unit, target, grid):
-		var result := EnemyAI.do_attack(unit, target)
+		var result := EnemyAI.do_attack(unit, target, cutaway_queue)
 		if result >= 0:
 			log.append("%s ATTACKS %s  [%d/%d]%s" % [
 				unit.unit_id, target.unit_id,
