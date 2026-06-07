@@ -69,7 +69,7 @@ static func _nearest_player_in_los(unit: Unit, all_units: Array[Unit], grid: Gri
 	for u in all_units:
 		if not u.is_player or u.is_downed:
 			continue
-		if LOS.has_los(unit.grid_pos, u.grid_pos, grid):
+		if LOSCalculator.has_los(unit.grid_pos, u.grid_pos, grid):
 			var d := EnemyAI.chebyshev(unit.grid_pos, u.grid_pos)
 			if d < best:
 				best = d

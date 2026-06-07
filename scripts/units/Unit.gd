@@ -4,6 +4,9 @@ extends Node2D
 enum Archetype { NONE, GUARDIAN, RAMPAGING, TACTICAL }
 enum DamageResult { NORMAL, GEAR_FRACTURED, GEAR_BROKEN, DOWNED }
 
+signal toughness_changed(unit: Unit, new_value: int)
+signal unit_downed(unit: Unit)
+
 const RADIUS: float = 10.0
 const PLAYER_COLOR    := Color(0.22, 0.52, 0.82)
 const GUARDIAN_COLOR  := Color(0.65, 0.20, 0.15)
@@ -40,7 +43,7 @@ var vanguard_rank: int = 1
 # Guardian fields
 var patrol_path: Array[GridPos] = []
 var patrol_index: int = 0
-var zone_min_row: int = -1   # -1 = no boundary
+var zone_min_row: int = -1
 var zone_max_row: int = -1
 var is_alerted: bool = false
 
@@ -91,6 +94,7 @@ func has_medical_kit() -> bool:
 
 func take_damage(amount: int) -> int:
 	toughness = max(0, toughness - amount)
+	toughness_changed.emit(self, toughness)
 	if toughness > 0:
 		queue_redraw()
 		return DamageResult.NORMAL
@@ -113,10 +117,12 @@ func take_damage(amount: int) -> int:
 	if fractured_item != null:
 		fractured_item.state = GearItem.GearState.BROKEN
 		is_downed = true
+		unit_downed.emit(self)
 		queue_redraw()
 		return DamageResult.GEAR_BROKEN
 
 	is_downed = true
+	unit_downed.emit(self)
 	queue_redraw()
 	return DamageResult.DOWNED
 
@@ -170,7 +176,6 @@ func _draw() -> void:
 
 	draw_circle(Vector2.ZERO, RADIUS, fill)
 
-	# Archetype indicator for enemies
 	if not is_player:
 		match archetype:
 			Archetype.RAMPAGING:
@@ -194,14 +199,12 @@ func _draw() -> void:
 	if is_selected:
 		draw_arc(Vector2.ZERO, RADIUS + 7.0, 0.0, TAU, 32, SELECT_RING, 2.0)
 
-	# Toughness bar
 	var bw := RADIUS * 2.2
 	var bx := -bw * 0.5
 	var by := RADIUS + 3.5
 	draw_rect(Rect2(bx, by, bw, 3.0), BAR_BACK)
 	draw_rect(Rect2(bx, by, bw * (float(toughness) / float(max_toughness)), 3.0), BAR_FILL)
 
-	# Gear state notches — orange = FRACTURED, dark = BROKEN
 	var notch_x := RADIUS + 2.0
 	var notch_y := -RADIUS
 	for item: GearItem in gear:

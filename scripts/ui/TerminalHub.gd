@@ -5,7 +5,8 @@ const REPAIR_COST := 80
 
 var _credits: int = 0
 var _credits_label: Label = null
-var _ms: MissionState = null
+var _gs: Node = null
+var _sm: Node = null
 var _all_crew_gear: Array = []
 
 func _ready() -> void:
@@ -16,9 +17,10 @@ func _ready() -> void:
 	bg.color = Color(0.03, 0.03, 0.04)
 	add_child(bg)
 
-	_ms = get_node("/root/MissionState")
-	_credits = SaveData.load_credits()
-	_all_crew_gear = SaveData.load_crew_gear()
+	_gs = get_node("/root/GameState")
+	_sm = get_node("/root/SaveManager")
+	_credits = _gs.credits
+	_all_crew_gear = _gs.crew
 
 	var vbox := VBoxContainer.new()
 	vbox.set_position(Vector2(340, 50))
@@ -28,7 +30,6 @@ func _ready() -> void:
 	_row(vbox, "═══════════ TERMINAL HUB ═══════════")
 	_row(vbox, "")
 
-	# Credits balance
 	var credits_hbox := HBoxContainer.new()
 	vbox.add_child(credits_hbox)
 	_inline(credits_hbox, "CREDITS:  ")
@@ -39,11 +40,11 @@ func _ready() -> void:
 	_row(vbox, "")
 	_row(vbox, "── FENCE SALVAGE ──")
 
-	if _ms.loot.is_empty():
+	if _gs.pending_loot.is_empty():
 		_row(vbox, "  (no salvage recovered)")
 	else:
-		for loot_item: Dictionary in _ms.loot:
-			_add_fence_row(vbox, loot_item)
+		for gear_item: GearItem in _gs.pending_loot:
+			_add_fence_row(vbox, gear_item)
 
 	_row(vbox, "")
 	_row(vbox, "── REPAIR BAY ──")
@@ -51,7 +52,7 @@ func _ready() -> void:
 	var has_broken := false
 	for crew_entry: Dictionary in _all_crew_gear:
 		for item_data: Dictionary in crew_entry.get("gear", []):
-			if item_data.get("state", "") == "BROKEN":
+			if item_data.get("state", GearItem.GearState.INTACT) == GearItem.GearState.BROKEN:
 				_add_repair_row(vbox, crew_entry.get("unit_id", "?"), item_data)
 				has_broken = true
 	if not has_broken:
@@ -68,14 +69,12 @@ func _ready() -> void:
 	depart_btn.pressed.connect(_on_depart)
 	vbox.add_child(depart_btn)
 
-func _add_fence_row(parent: VBoxContainer, loot_item: Dictionary) -> void:
+func _add_fence_row(parent: VBoxContainer, gear_item: GearItem) -> void:
 	var hbox := HBoxContainer.new()
 	parent.add_child(hbox)
-	var item_id: String = loot_item.get("item_id", "?")
-	var slot: String = loot_item.get("slot", "?").to_upper()
 
 	var lbl := Label.new()
-	lbl.text = "  %s [%s]" % [item_id, slot]
+	lbl.text = "  %s [%s]" % [gear_item.item_id, gear_item.slot.to_upper()]
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(lbl)
 
@@ -88,7 +87,8 @@ func _add_fence_row(parent: VBoxContainer, loot_item: Dictionary) -> void:
 	btn.pressed.connect(func() -> void:
 		_credits += FENCE_VALUE
 		_credits_label.text = str(_credits)
-		SaveData.save_credits(_credits)
+		_gs.credits = _credits
+		_sm.save()
 		lbl.text = lbl.text + "  [SOLD]"
 		btn.disabled = true
 		val_lbl.text = ""
@@ -117,7 +117,7 @@ func _add_repair_row(parent: VBoxContainer, unit_id: String, item_data: Dictiona
 			return
 		_credits -= REPAIR_COST
 		_credits_label.text = str(_credits)
-		SaveData.save_credits(_credits)
+		_gs.credits = _credits
 		_do_repair(unit_id, item_id)
 		lbl.text = lbl.text.replace("[BROKEN]", "[REPAIRED]")
 		btn.disabled = true
@@ -130,9 +130,10 @@ func _do_repair(unit_id: String, item_id: String) -> void:
 		if crew_entry.get("unit_id", "") == unit_id:
 			for item_data: Dictionary in crew_entry.get("gear", []):
 				if item_data.get("item_id", "") == item_id \
-						and item_data.get("state", "") == "BROKEN":
-					item_data["state"] = "INTACT"
-					SaveData.save_crew_gear(_all_crew_gear)
+						and item_data.get("state", GearItem.GearState.INTACT) == GearItem.GearState.BROKEN:
+					item_data["state"] = GearItem.GearState.INTACT
+					_gs.crew = _all_crew_gear
+					_sm.save()
 					return
 
 func _row(parent: Control, text: String) -> void:
@@ -147,4 +148,4 @@ func _inline(parent: Control, text: String) -> void:
 	parent.add_child(lbl)
 
 func _on_depart() -> void:
-	get_node("/root/SceneTransition").change_to("res://scenes/SalvageManifest.tscn")
+	get_tree().change_scene_to_file("res://scenes/ui/ManifestScreen.tscn")

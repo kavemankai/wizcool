@@ -15,9 +15,9 @@ var move_tiles: Array[GridPos] = []
 var round_number: int = 1
 var dropped_loot: Array[GearItem] = []
 var rival_rank: int = 1
-var hazard_manager: HazardManager = null
+var hazard_manager: HazardSystem = null
 
-# unit_id → {is_leader: bool, gear: [{item_id, slot, state: "INTACT"|"FRACTURED"|"BROKEN"}]}
+# unit_id → {is_leader: bool, gear: [{item_id, slot, state: int (GearState enum)}]}
 var _gear_archive: Dictionary = {}
 
 @onready var grid_manager: GridManager = $GridManager
@@ -34,8 +34,8 @@ func _ready() -> void:
 	)
 	hud.end_turn_pressed.connect(_on_end_turn)
 	hud.field_patch_pressed.connect(_on_field_patch)
-	hazard_manager = HazardManager.new()
-	rival_rank = SaveData.load_rival_rank()
+	hazard_manager = HazardSystem.new()
+	rival_rank = get_node("/root/GameState").vanguard_rank
 	grid_manager.set_extraction_tile(GridPos.new(EXTRACTION_POS.x, EXTRACTION_POS.y))
 	_spawn_units()
 	hud.set_round(round_number)
@@ -48,13 +48,14 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 func _spawn_units() -> void:
-	var saved_gear := SaveData.load_crew_gear()
+	var saved_gear: Array = get_node("/root/GameState").crew
 
 	var alpha := _make_unit("ALPHA", true, true, 6, 2, 3, 4)
 	alpha.gear.append(GearItem.make_weapon("PLASMA-CUTTER", 2, 3))
 	alpha.gear.append(GearItem.make_medical_kit("FIELD-PATCH-KIT"))
 	_place(alpha, GridPos.new(5, 17))
 	_apply_saved_gear(alpha, saved_gear)
+	_apply_starting_fractured_gear(alpha)
 	_archive_unit(alpha)
 
 	var bravo := _make_unit("BRAVO", true, false, 5, 2, 4, 2)
@@ -151,7 +152,7 @@ func _place(unit: Unit, pos: GridPos) -> void:
 func _archive_unit(unit: Unit) -> void:
 	var gear_data: Array = []
 	for item: GearItem in unit.gear:
-		gear_data.append({"item_id": item.item_id, "slot": item.slot, "state": _state_str(item.state)})
+		gear_data.append({"item_id": item.item_id, "slot": item.slot, "state": item.state})
 	_gear_archive[unit.unit_id] = {"is_leader": unit.is_leader, "gear": gear_data}
 
 func _apply_saved_gear(unit: Unit, saved: Array) -> void:
@@ -160,21 +161,20 @@ func _apply_saved_gear(unit: Unit, saved: Array) -> void:
 			for gear_data in entry.get("gear", []):
 				for item: GearItem in unit.gear:
 					if item.item_id == gear_data.get("item_id", ""):
-						item.state = _state_from_str(gear_data.get("state", "INTACT"))
+						item.state = gear_data.get("state", GearItem.GearState.INTACT)
 						break
 			break
 
-func _state_str(state: int) -> String:
-	match state:
-		GearItem.GearState.FRACTURED: return "FRACTURED"
-		GearItem.GearState.BROKEN:    return "BROKEN"
-	return "INTACT"
-
-func _state_from_str(s: String) -> int:
-	match s:
-		"FRACTURED": return GearItem.GearState.FRACTURED
-		"BROKEN":    return GearItem.GearState.BROKEN
-	return GearItem.GearState.INTACT
+func _apply_starting_fractured_gear(unit: Unit) -> void:
+	var lowest_item: GearItem = null
+	var lowest_mod := 9999
+	for item: GearItem in unit.gear:
+		if item.slot != "medical" and item.state == GearItem.GearState.INTACT:
+			if item.modifier < lowest_mod:
+				lowest_mod = item.modifier
+				lowest_item = item
+	if lowest_item != null:
+		lowest_item.state = GearItem.GearState.FRACTURED
 
 func _build_crew_snapshot() -> Array:
 	var snap: Array = []
@@ -186,17 +186,6 @@ func _build_crew_snapshot() -> Array:
 			"gear": entry.get("gear", []).duplicate()
 		})
 	return snap
-
-func _save_crew_gear_to_disk() -> void:
-	var data: Array = []
-	for unit_id: String in _gear_archive:
-		var entry: Dictionary = _gear_archive[unit_id]
-		data.append({
-			"unit_id": unit_id,
-			"is_leader": entry.get("is_leader", false),
-			"gear": entry.get("gear", [])
-		})
-	SaveData.save_crew_gear(data)
 
 # ---------------------------------------------------------------------------
 # Input
@@ -310,7 +299,7 @@ func _can_attack(attacker: Unit, target: Unit) -> bool:
 	var dy: int = absi(attacker.grid_pos.y - target.grid_pos.y)
 	if maxi(dx, dy) > attacker.attack_range:
 		return false
-	return LOS.has_los(attacker.grid_pos, target.grid_pos, grid_manager)
+	return LOSCalculator.has_los(attacker.grid_pos, target.grid_pos, grid_manager)
 
 func _do_move(unit: Unit, pos: GridPos) -> void:
 	unit.place_at(pos, grid_manager)
@@ -322,7 +311,7 @@ func _do_move(unit: Unit, pos: GridPos) -> void:
 
 func _do_attack(attacker: Unit, target: Unit) -> void:
 	var dmg := attacker.get_weapon_damage()
-	var result := target.take_damage(dmg)
+	var result := CombatResolver.resolve_damage(target, dmg)
 	attacker.has_attacked = true
 	match result:
 		Unit.DamageResult.NORMAL:
@@ -432,7 +421,14 @@ func _run_enemy_phase() -> void:
 
 		await get_tree().create_timer(0.3).timeout
 
-		var lines := EnemyAI.take_turn(enemy, units, grid_manager, round_number)
+		var lines: Array[String] = []
+		match enemy.archetype:
+			Unit.Archetype.GUARDIAN:
+				lines = GuardianAI.take_turn(enemy, units, grid_manager)
+			Unit.Archetype.RAMPAGING:
+				lines = RampagingAI.take_turn(enemy, units, grid_manager)
+			Unit.Archetype.TACTICAL:
+				lines = TacticalAI.take_turn(enemy, units, grid_manager, round_number)
 		for line in lines:
 			hud.log(line)
 
@@ -455,11 +451,11 @@ func _run_enemy_phase() -> void:
 				continue
 			for wp in warned:
 				if u.grid_pos.equals(wp):
-					var result := u.take_damage(HazardManager.HAZARD_DAMAGE)
+					var result := CombatResolver.resolve_damage(u, HazardSystem.HAZARD_DAMAGE)
 					match result:
 						Unit.DamageResult.NORMAL:
 							hud.log("[HAZARD] %s  -%d TGH  [%d/%d]" % [
-								u.unit_id, HazardManager.HAZARD_DAMAGE,
+								u.unit_id, HazardSystem.HAZARD_DAMAGE,
 								u.toughness, u.max_toughness])
 						Unit.DamageResult.GEAR_FRACTURED:
 							hud.log("[HAZARD] %s  GEAR FRACTURED — TGH RESET" % u.unit_id)
@@ -549,37 +545,51 @@ func _on_mission_success() -> void:
 	game_phase = GamePhase.GAME_OVER
 	for u in _get_player_units():
 		_archive_unit(u)
-	_save_crew_gear_to_disk()
-	SaveData.save_credits(SaveData.load_credits() + DANGER_PAY)
-	var ms: MissionState = get_node("/root/MissionState")
-	ms.record_result(true, "", _build_crew_snapshot(), dropped_loot, rival_rank, DANGER_PAY)
+	var gs: Node = get_node("/root/GameState")
+	var sm: Node = get_node("/root/SaveManager")
+	gs.crew = _build_crew_snapshot()
+	gs.credits += DANGER_PAY
+	gs.pending_loot = dropped_loot
+	gs.last_mission_result = {
+		"success": true,
+		"fail_reason": "",
+		"danger_pay": DANGER_PAY,
+		"rival_rank": rival_rank,
+	}
+	sm.save()
 	await get_tree().create_timer(1.5).timeout
-	get_node("/root/SceneTransition").change_to("res://scenes/MissionResult.tscn")
+	get_tree().change_scene_to_file("res://scenes/ui/PostMissionScreen.tscn")
 
 func _on_mission_fail(reason: String) -> void:
 	game_phase = GamePhase.GAME_OVER
 	rival_rank += 1
-	SaveData.save_rival_rank(rival_rank)
 	hud.log("VANGUARD RANK NOW %d" % rival_rank)
 
-	# Fracture living crew gear then archive
 	for u in _get_player_units():
 		for item: GearItem in u.gear:
 			if item.state == GearItem.GearState.INTACT:
 				item.state = GearItem.GearState.FRACTURED
 		_archive_unit(u)
 
-	# Fracture any INTACT items still in archive (from previously downed crew)
 	for unit_id: String in _gear_archive:
 		for item_data: Dictionary in _gear_archive[unit_id]["gear"]:
-			if item_data.get("state", "INTACT") == "INTACT":
-				item_data["state"] = "FRACTURED"
+			if item_data.get("state", GearItem.GearState.INTACT) == GearItem.GearState.INTACT:
+				item_data["state"] = GearItem.GearState.FRACTURED
 
-	_save_crew_gear_to_disk()
-	var ms: MissionState = get_node("/root/MissionState")
-	ms.record_result(false, reason, _build_crew_snapshot(), dropped_loot, rival_rank, 0)
+	var gs: Node = get_node("/root/GameState")
+	var sm: Node = get_node("/root/SaveManager")
+	gs.crew = _build_crew_snapshot()
+	gs.vanguard_rank = rival_rank
+	gs.pending_loot = dropped_loot
+	gs.last_mission_result = {
+		"success": false,
+		"fail_reason": reason,
+		"danger_pay": 0,
+		"rival_rank": rival_rank,
+	}
+	sm.save()
 	await get_tree().create_timer(1.5).timeout
-	get_node("/root/SceneTransition").change_to("res://scenes/MissionResult.tscn")
+	get_tree().change_scene_to_file("res://scenes/ui/PostMissionScreen.tscn")
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -18,12 +18,12 @@ config/name="Fringe Ledger"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.6")
 config/icon="res://icon.svg"
-config/run/main_scene="res://scenes/SalvageManifest.tscn"
+config/run/main_scene="res://scenes/ui/ManifestScreen.tscn"
 
 [autoload]
 
-MissionState="*res://scripts/MissionState.gd"
-SceneTransition="*res://scripts/SceneTransition.gd"
+GameState="*res://scripts/data/GameState.gd"
+SaveManager="*res://scripts/data/SaveManager.gd"
 
 [display]
 

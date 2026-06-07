@@ -13,7 +13,7 @@ func _ready() -> void:
 	vbox.set_size(Vector2(520, 600))
 	add_child(vbox)
 
-	var rival_rank := SaveData.load_rival_rank()
+	var rival_rank: int = get_node("/root/GameState").vanguard_rank
 
 	_row(vbox, "═══════════ SALVAGE MANIFEST ═══════════")
 	_row(vbox, "CONTRACT   :  CONTAINMENT BREACH")
@@ -50,4 +50,4 @@ func _row(parent: Control, text: String) -> void:
 	parent.add_child(lbl)
 
 func _on_begin() -> void:
-	get_node("/root/SceneTransition").change_to("res://scenes/Main.tscn")
+	get_tree().change_scene_to_file("res://scenes/Main.tscn")

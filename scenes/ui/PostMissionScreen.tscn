@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/PostMissionScreen.gd" id="1_result"]
+
+[node name="PostMissionScreen" type="Control"]
+script = ExtResource("1_result")

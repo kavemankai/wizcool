@@ -1,22 +1,13 @@
 class_name EnemyAI
 extends RefCounted
 
-# Dispatcher — routes to the correct archetype AI and provides shared helpers.
+# Base class providing shared helpers for all AI archetypes.
+# Dispatch lives in Main.gd — each archetype is self-contained.
 
-static func take_turn(unit: Unit, all_units: Array[Unit],
-		grid: GridManager, round_num: int = 0) -> Array[String]:
-	match unit.archetype:
-		Unit.Archetype.GUARDIAN:  return GuardianAI.take_turn(unit, all_units, grid)
-		Unit.Archetype.RAMPAGING: return RampagingAI.take_turn(unit, all_units, grid)
-		Unit.Archetype.TACTICAL:  return TacticalAI.take_turn(unit, all_units, grid, round_num)
-	return []
-
-# Move unit to pos (teleport in Phase 3; Phase 10 adds animation).
 static func move_to(unit: Unit, pos: GridPos, grid: GridManager) -> void:
 	unit.place_at(pos, grid)
 	unit.has_moved = true
 
-# Apply attack. Returns Unit.DamageResult value, or -1 if attack not made.
 static func do_attack(attacker: Unit, target: Unit) -> int:
 	if attacker.has_attacked or target.is_downed:
 		return -1
@@ -25,9 +16,6 @@ static func do_attack(attacker: Unit, target: Unit) -> int:
 	attacker.has_attacked = true
 	return result
 
-# Find the reachable tile that minimises Chebyshev distance to target_pos.
-# When respect_zone is true, only considers tiles within unit.zone_min/max_row.
-# blocked_tiles are treated as impassable (used to avoid hazard warning tiles).
 static func best_move_toward(unit: Unit, target_pos: GridPos,
 		all_units: Array[Unit], grid: GridManager,
 		respect_zone: bool = true,
@@ -49,7 +37,6 @@ static func best_move_toward(unit: Unit, target_pos: GridPos,
 
 	return best
 
-# Nearest unit to from_unit among candidates (any faction unless filtered by caller).
 static func nearest_unit(from_unit: Unit, candidates: Array[Unit]) -> Unit:
 	var nearest: Unit = null
 	var best := 9999
@@ -67,7 +54,7 @@ static func can_attack(attacker: Unit, target: Unit, grid: GridManager) -> bool:
 		return false
 	if chebyshev(attacker.grid_pos, target.grid_pos) > attacker.attack_range:
 		return false
-	return LOS.has_los(attacker.grid_pos, target.grid_pos, grid)
+	return LOSCalculator.has_los(attacker.grid_pos, target.grid_pos, grid)
 
 static func chebyshev(a: GridPos, b: GridPos) -> int:
 	return max(abs(a.x - b.x), abs(a.y - b.y))

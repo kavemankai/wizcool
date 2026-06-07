@@ -1,9 +1,8 @@
-class_name LOS
+class_name LOSCalculator
 extends RefCounted
 
 # Returns true if there is an unobstructed line of sight between two grid positions.
 # Wall tiles block LOS. Cover tiles do NOT block LOS.
-# Uses parametric linear interpolation across the grid.
 static func has_los(from_pos: GridPos, to_pos: GridPos, grid: GridManager) -> bool:
 	var x0 := from_pos.x
 	var y0 := from_pos.y
