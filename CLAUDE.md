@@ -19,16 +19,51 @@ Tactical gear-focused sRPG. Industrial hard sci-fi / cassette-futurism aesthetic
 ```
 res://
   scenes/
-    Main.tscn           # Phase 1: Grid shell, unit, camera
+    Main.tscn               # Skirmish scene: GridManager, UnitLayer, Camera2D, HUD
+    ui/
+      ManifestScreen.tscn   # Pre-mission crew/gear selection
+      PostMissionScreen.tscn
+      TerminalHub.tscn      # Repair, fence, contract select
   scripts/
-    GridPos.gd          # class_name GridPos — grid coordinate value object
-    GridManager.gd      # class_name GridManager — tile storage, draw, coordinate conversion
-    Unit.gd             # class_name Unit — drawn unit, selection state
-    Main.gd             # Root controller — input, unit spawn, selection
+    Main.gd                 # Root controller — input, turn loop, AI dispatch
+    core/
+      GridPos.gd            # class_name GridPos
+      GridManager.gd        # class_name GridManager
+      LOSCalculator.gd      # class_name LOSCalculator (static has_los)
+      MovementRange.gd      # class_name MovementRange
+      TurnManager.gd        # stub — signals: turn_started, round_started
+    units/
+      GearItem.gd           # class_name GearItem — GearState enum {INTACT,FRACTURED,BROKEN}
+      Unit.gd               # class_name Unit — signals: toughness_changed, unit_downed
+      ai/
+        EnemyAI.gd          # class_name EnemyAI — shared helpers only, no dispatch
+        GuardianAI.gd       # class_name GuardianAI
+        RampagingAI.gd      # class_name RampagingAI
+        TacticalAI.gd       # class_name TacticalAI
+    systems/
+      CombatResolver.gd     # class_name CombatResolver — static resolve_damage()
+      GearSystem.gd         # stub — signal: gear_state_changed
+      HazardSystem.gd       # class_name HazardSystem — pressure dump zones
+      MissionSystem.gd      # stub — signal: mission_complete
+      RivalSystem.gd        # stub
+    ui/
+      HUD.gd                # class_name HUD
+      ManifestScreen.gd     # pre-mission screen
+      PostMissionScreen.gd  # result screen — reads GameState
+      TerminalHub.gd        # hub screen — reads/writes GameState, calls SaveManager.save()
+    data/
+      GameState.gd          # AUTOLOAD — state holder, no logic
+      SaveManager.gd        # AUTOLOAD — reads/writes GameState to disk (JSON)
   assets/
     audio/
     sprites/
 ```
+
+## Autoloads
+
+Exactly two autoloads:
+- `GameState` — holds `credits`, `vanguard_rank`, `crew`, `gear_inventory`, `broken_inventory`, `fractured_inventory`, `last_mission_result`, `pending_loot`, `DEBUG_MODE`
+- `SaveManager` — `save()` and `load_save()` only; converts GearState ints ↔ JSON strings
 
 ## Grid Spec
 
@@ -71,10 +106,11 @@ var is_selected: bool
 - **Phase 4:** ✅ Fractured gear economy — three-state model, field-patch, Medical slot
 - **Phase 5:** ✅ Environmental hazards — warning system, pressure dump activation
 - **Phase 6:** ✅ The Rival — Vanguard faction, Rival Rank persistence
-- **Phase 7:** ✅ Mission loop — SalvageManifest screen, extraction tile (5,2), failure states, MissionResult screen, MissionState autoload
-- **Phase 8:** ✅ Terminal Hub — repair, fence, contract select, credit economy; SaveData JSON persistence for credits + crew_gear; SceneTransition autoload for fade transitions
-- **Phase 9:** ✅ "Containment Breach" — full hand-authored prototype mission; Zone A/B/C layout with dividers; enemy archetypes placed; extraction objective HUD log; DANGER_PAY=150 on success
-- **Phase 10:** ✅ Polish & feel — pulsing extraction tile, mission label in HUD, round counter, SceneTransition fade-in on scene load, full loop SalvageManifest→Main→MissionResult→TerminalHub
+- **Phase 7:** ✅ Mission loop — ManifestScreen, extraction tile (5,2), failure states, PostMissionScreen
+- **Phase 8:** ✅ Terminal Hub — repair, fence, contract select, credit economy; SaveManager JSON persistence
+- **Phase 9:** ✅ "Containment Breach" — full hand-authored prototype mission; Zone A/B/C; DANGER_PAY=150
+- **Phase 10:** ✅ Polish & feel — pulsing extraction tile, mission label in HUD, round counter, full loop
+- **Audit:** ✅ Code audit — script reorganization, signal-driven architecture, CombatResolver, GameState/SaveManager autoloads, enum-only gear state, starting fractured gear mechanic
 
 ## Zone Layout (Containment Breach prototype)
 
