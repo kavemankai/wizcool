@@ -82,6 +82,10 @@ var _precision_label: Label
 var _aoe_label: Label
 var _show_precision_preview: bool = false
 
+# Player crew portraits, keyed by unit_id (ALPHA/BRAVO/CHARLIE). Empty for enemies.
+var _unit_portrait: TextureRect
+var _portraits: Dictionary = {}
+
 var _log_lines: Array[String] = []
 
 func _ready() -> void:
@@ -110,10 +114,26 @@ func _ready() -> void:
 	# Sits above the primary action cluster (which starts at y≈358).
 	var inspect_rect := Rect2(SCREEN_W - MARGIN - 240, 96, 240, 250)
 	var inspect_panel := _panel(root, inspect_rect)
+	# Crew portrait — top-centre of the panel, shown only for player units that
+	# have one. Linear filter: these are painterly photo portraits, not pixel art.
+	_unit_portrait = TextureRect.new()
+	_unit_portrait.set_position(Vector2(78, 6))
+	_unit_portrait.set_size(Vector2(84, 84))
+	_unit_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_unit_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_unit_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_unit_portrait.visible = false
+	inspect_panel.add_child(_unit_portrait)
 	_unit_label = _label(inspect_panel, Rect2(10, 8, inspect_rect.size.x - 20,
 			inspect_rect.size.y - 16), "")
 	_unit_label.add_theme_font_size_override("font_size", FS_UNIT)
 	_unit_label.add_theme_color_override("font_color", PARCHMENT)
+
+	# Preload crew portraits if they've been imported.
+	for pid: String in ["ALPHA", "BRAVO", "CHARLIE"]:
+		var ppath := "res://assets/portraits/portrait_player_%s.png" % pid.to_lower()
+		if ResourceLoader.exists(ppath):
+			_portraits[pid] = load(ppath)
 
 	# --- Bottom-left: combat log --------------------------------------------
 	var log_rect := Rect2(MARGIN, SCREEN_H - MARGIN - 168, 420, 168)
@@ -306,7 +326,22 @@ func _on_debug_btn_pressed() -> void:
 func show_unit(unit: Unit) -> void:
 	if unit == null:
 		_unit_label.text = ""
+		_unit_portrait.visible = false
+		_unit_label.position = Vector2(10, 8)
+		_unit_label.size = Vector2(220, 234)
 		return
+	# Crew portrait: show it and drop the stat text below; otherwise full panel.
+	if unit.is_player and _portraits.has(unit.unit_id):
+		_unit_portrait.texture = _portraits[unit.unit_id]
+		_unit_portrait.visible = true
+		_unit_label.position = Vector2(10, 96)
+		_unit_label.size = Vector2(220, 146)
+		_unit_label.add_theme_font_size_override("font_size", 15)
+	else:
+		_unit_portrait.visible = false
+		_unit_label.position = Vector2(10, 8)
+		_unit_label.size = Vector2(220, 234)
+		_unit_label.add_theme_font_size_override("font_size", FS_UNIT)
 	var lines: Array[String] = []
 	lines.append(("[LEADER] " if unit.is_leader else "") + unit.unit_id)
 	lines.append("TOUGHNESS  %d / %d" % [unit.toughness, unit.max_toughness])

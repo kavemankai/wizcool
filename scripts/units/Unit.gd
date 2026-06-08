@@ -221,6 +221,16 @@ func _draw() -> void:
 
 	draw_circle(Vector2.ZERO, RADIUS, fill)
 
+	# Player crew show their callsign initial (A/B/C) inside the sprite.
+	if is_player and not unit_id.is_empty():
+		var font: Font = ThemeDB.fallback_font
+		var ch := unit_id.substr(0, 1)
+		var fsize := 11
+		var sz := font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize)
+		var baseline := (font.get_ascent(fsize) - font.get_descent(fsize)) * 0.5
+		draw_string(font, Vector2(-sz.x * 0.5, baseline), ch,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, fsize, Color(0.96, 0.96, 0.98))
+
 	if not is_player:
 		match archetype:
 			Archetype.RAMPAGING:
