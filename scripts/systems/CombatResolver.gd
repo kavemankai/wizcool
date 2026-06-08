@@ -32,6 +32,10 @@ static func resolve_damage_ex(
 			amount -= reduction
 			amount = maxi(1, amount)  # cover reduces to minimum 1, never 0
 
+	# BRACE — defensive stance reduces the next incoming hit (min 1)
+	if target.is_braced():
+		amount = maxi(1, amount - CombatConstants.BRACE_DAMAGE_REDUCTION)
+
 	return resolve_damage(target, amount)
 
 ## Convenience helper — construct and apply a status effect to a unit.

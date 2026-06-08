@@ -1,7 +1,7 @@
 extends Node2D
 
 enum GamePhase { PLAYER_TURN, ENEMY_TURN, GAME_OVER }
-enum InputState { IDLE, ACTING }
+enum InputState { IDLE, ACTING, ABILITY_TARGETING }
 
 const ROUND_LIMIT: int = 20
 
@@ -24,6 +24,12 @@ var _skip_requested: bool = false
 var _show_cutaway: bool = true
 var _debug_mode: bool = false
 
+# Vanguard reinforcement timing. A mission may defer the Vanguard so they
+# arrive mid-mission instead of at the start. vanguard_spawn_turn <= 1 means
+# they deploy immediately (the default for most missions).
+var _vanguard_spawn_turn: int = 1
+var _vanguard_deployed: bool = false
+
 # unit_id → {is_leader: bool, gear: [{item_id, slot, state: int (GearState enum)}]}
 var _gear_archive: Dictionary = {}
 
@@ -43,10 +49,11 @@ func _ready() -> void:
 	hud.end_turn_pressed.connect(_on_end_turn)
 	hud.field_patch_pressed.connect(_on_field_patch)
 	hud.skip_pressed.connect(func() -> void: _skip_requested = true)
+	hud.ability_pressed.connect(_on_ability_pressed)
 	hud.cutaway_toggled.connect(func(on: bool) -> void: _show_cutaway = on)
 	hud.debug_toggled.connect(func(on: bool) -> void: _debug_mode = on)
 
-	var gs: Node = get_node("/root/GameState")
+	var gs := GameState
 	_mission = CampaignData.get_mission(gs.current_campaign_id, gs.current_mission_index)
 	_objective_type = _mission.get("objective", CampaignData.ObjectiveType.EXTRACTION)
 	_objective_data = _mission.get("objective_data", {})
@@ -84,7 +91,7 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 func _spawn_units_from_mission() -> void:
-	var saved_gear: Array = get_node("/root/GameState").crew
+	var saved_gear: Array = GameState.crew
 	var player_spawns: Array = _mission.get("player_spawns", [])
 
 	var alpha_pos := _get_spawn_pos(player_spawns, "ALPHA",   Vector2i(5, 17))
@@ -119,7 +126,10 @@ func _spawn_units_from_mission() -> void:
 	for ec: Dictionary in _mission.get("enemy_config", []):
 		_spawn_enemy_from_config(ec)
 
-	_spawn_vanguard()
+	_vanguard_spawn_turn = _mission.get("vanguard_spawn_turn", 1)
+	if _vanguard_spawn_turn <= 1:
+		_spawn_vanguard()
+		_vanguard_deployed = true
 
 func _get_spawn_pos(spawns: Array, unit_id: String, default_pos: Vector2i) -> Vector2i:
 	for s: Dictionary in spawns:
@@ -292,6 +302,23 @@ func _handle_click(click_pos: Vector2) -> void:
 			else:
 				_enter_idle()
 
+		InputState.ABILITY_TARGETING:
+			if clicked_unit != null and not clicked_unit.is_player \
+					and not clicked_unit.is_downed and _can_attack(active_unit, clicked_unit):
+				_do_ability(active_unit, clicked_unit)
+				if game_phase == GamePhase.GAME_OVER:
+					_enter_idle()
+					return
+				input_state = InputState.ACTING
+				_refresh_highlights()
+				if not active_unit.can_act():
+					_enter_idle()
+			else:
+				# Tapped a non-target — cancel ability targeting, back to ACTING.
+				hud.log("ABILITY CANCELLED")
+				input_state = InputState.ACTING
+				_refresh_highlights()
+
 # ---------------------------------------------------------------------------
 # Selection & highlights
 # ---------------------------------------------------------------------------
@@ -314,6 +341,7 @@ func _enter_idle() -> void:
 	grid_manager.clear_all_highlights()
 	hud.show_unit(null)
 	hud.set_field_patch_visible(false)
+	hud.set_ability_visible(false)
 	hud.set_precision_indicator(false)
 	input_state = InputState.IDLE
 
@@ -346,6 +374,10 @@ func _refresh_highlights() -> void:
 
 	hud.show_unit(active_unit)
 	hud.set_field_patch_visible(_can_field_patch(active_unit))
+	if _can_use_ability(active_unit):
+		hud.set_ability_visible(true, _get_unit_special(active_unit).get_label())
+	else:
+		hud.set_ability_visible(false)
 
 func _is_move_tile(pos: GridPos) -> bool:
 	for t in move_tiles:
@@ -452,6 +484,118 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 			_on_mission_fail("LEADER DOWNED")
 		else:
 			_check_game_over()
+
+# ---------------------------------------------------------------------------
+# Weapon special abilities (player-activated)
+# ---------------------------------------------------------------------------
+
+## Returns the equipped weapon's WeaponSpecial, or null if none.
+func _get_unit_special(unit: Unit) -> WeaponSpecial:
+	if unit == null:
+		return null
+	for item: GearItem in unit.gear:
+		if item.slot == "weapon" and item.special != null:
+			return item.special
+	return null
+
+## True when the unit can fire its weapon special right now.
+func _can_use_ability(unit: Unit) -> bool:
+	if unit == null or not unit.is_player or unit.has_attacked:
+		return false
+	if unit.has_status(StatusEffect.Type.OVERLOADED):
+		return false
+	var sp := _get_unit_special(unit)
+	return sp != null and sp.is_ready()
+
+## ABILITY button pressed. Self-target abilities fire immediately; targeted
+## abilities enter ABILITY_TARGETING so the player taps a valid enemy.
+func _on_ability_pressed() -> void:
+	if active_unit == null or not _can_use_ability(active_unit):
+		return
+	var sp := _get_unit_special(active_unit)
+	if sp.type == WeaponSpecial.SpecialType.BRACE:
+		_do_brace(active_unit, sp)
+		_refresh_highlights()
+		if not active_unit.can_act():
+			_enter_idle()
+		return
+	# Targeted ability — highlight valid enemies and wait for a tap.
+	var targets: Array[GridPos] = []
+	for u in units:
+		if u.is_player or u.is_downed:
+			continue
+		if _can_attack(active_unit, u):
+			targets.append(u.grid_pos)
+	if targets.is_empty():
+		hud.log("NO TARGET IN RANGE FOR %s" % sp.get_label())
+		return
+	input_state = InputState.ABILITY_TARGETING
+	grid_manager.set_move_highlights([])
+	grid_manager.set_attack_highlights(targets)
+	hud.set_ability_visible(false)
+	hud.set_field_patch_visible(false)
+	hud.set_precision_indicator(false)
+	hud.log("SELECT TARGET — %s" % sp.get_label())
+
+## Dispatch a targeted ability against the tapped enemy.
+func _do_ability(attacker: Unit, target: Unit) -> void:
+	var sp := _get_unit_special(attacker)
+	if sp == null:
+		return
+	match sp.type:
+		WeaponSpecial.SpecialType.ARC_PULSE:
+			_do_arc_pulse(attacker, target, sp)
+		WeaponSpecial.SpecialType.CORROSIVE_BURST:
+			_do_corrosive_burst(attacker, target, sp)
+		_:
+			# SUPPRESSING_FIRE or any other targeted special: damage + suppress.
+			_do_arc_pulse(attacker, target, sp)
+	_resolve_post_action()
+
+func _do_arc_pulse(attacker: Unit, target: Unit, sp: WeaponSpecial) -> void:
+	var dmg := CombatConstants.ARC_PULSE_DAMAGE
+	CombatResolver.resolve_damage_ex(attacker, target, dmg, false, grid_manager)
+	CombatResolver.apply_status(target, StatusEffect.Type.SUPPRESSED)
+	var chained := 0
+	for u in units:
+		if u == target or u.is_player or u.is_downed:
+			continue
+		var d: int = maxi(absi(u.grid_pos.x - target.grid_pos.x), absi(u.grid_pos.y - target.grid_pos.y))
+		if d <= CombatConstants.ARC_PULSE_CHAIN_RADIUS:
+			CombatResolver.apply_status(u, StatusEffect.Type.SUPPRESSED)
+			chained += 1
+	attacker.has_attacked = true
+	sp.activate()
+	AudioManager.play_sfx("weapon_plasma_cutter")
+	var suffix := "  [+%d CHAINED]" % chained if chained > 0 else ""
+	hud.log("%s ARC PULSE → %s  -%d TGH  [SUPPRESSED]%s" % [
+		attacker.unit_id, target.unit_id, dmg, suffix])
+
+func _do_corrosive_burst(attacker: Unit, target: Unit, sp: WeaponSpecial) -> void:
+	var dmg := CombatConstants.CORROSIVE_BURST_DAMAGE
+	CombatResolver.resolve_damage_ex(attacker, target, dmg, false, grid_manager)
+	CombatResolver.apply_status(target, StatusEffect.Type.CORRODED)
+	attacker.has_attacked = true
+	sp.activate()
+	AudioManager.play_sfx("weapon_long_bore_drill")
+	hud.log("%s CORROSIVE BURST → %s  -%d TGH  [CORRODED]" % [
+		attacker.unit_id, target.unit_id, dmg])
+
+func _do_brace(unit: Unit, sp: WeaponSpecial) -> void:
+	sp.activate()  # sets is_braced + starts cooldown
+	unit.has_attacked = true
+	AudioManager.play_sfx("weapon_impact_wrench")
+	hud.log("%s BRACES — NEXT INCOMING HIT REDUCED BY %d" % [
+		unit.unit_id, CombatConstants.BRACE_DAMAGE_REDUCTION])
+
+## Flush downed units and resolve mission/game-over after an offensive action.
+func _resolve_post_action() -> void:
+	var leader_fell := _flush_downed()
+	if leader_fell:
+		hud.log("=== LEADER DOWN — MISSION FAILED ===")
+		_on_mission_fail("LEADER DOWNED")
+	else:
+		_check_game_over()
 
 # ---------------------------------------------------------------------------
 # Field Patch
@@ -636,6 +780,13 @@ func _run_enemy_phase() -> void:
 				u.tick_turn_start()
 			u.queue_redraw()
 
+	# Deferred Vanguard reinforcements — they cut in from the tip of the map
+	# on their scheduled round (e.g. cb-1 arrivals on round 3).
+	if not _vanguard_deployed and round_number >= _vanguard_spawn_turn:
+		_spawn_vanguard()
+		_vanguard_deployed = true
+		hud.log("[VANGUARD SALVAGE CO. // REINFORCEMENTS INBOUND — TOP OF SITE]")
+
 	var next_zone := hazard_manager.get_active_zone(round_number)
 	if next_zone.size() > 0:
 		grid_manager.set_warning_tiles(next_zone)
@@ -706,8 +857,8 @@ func _on_mission_success() -> void:
 	AudioManager.play_sfx("mission_complete")
 	for u in _get_player_units():
 		_archive_unit(u)
-	var gs: Node = get_node("/root/GameState")
-	var sm: Node = get_node("/root/SaveManager")
+	var gs := GameState
+	var sm := SaveManager
 	gs.crew = _build_crew_snapshot()
 	gs.pending_loot = dropped_loot
 
@@ -747,8 +898,8 @@ func _on_mission_fail(reason: String) -> void:
 	AudioManager.play_sfx("mission_fail")
 	for u in _get_player_units():
 		_archive_unit(u)
-	var gs: Node = get_node("/root/GameState")
-	var sm: Node = get_node("/root/SaveManager")
+	var gs := GameState
+	var sm := SaveManager
 	gs.crew = _build_crew_snapshot()
 	gs.pending_loot = dropped_loot
 	# Gear fracture and rank change happen ONLY on Abandon (handled in PostMissionScreen)

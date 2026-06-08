@@ -7,7 +7,7 @@ func _ready() -> void:
 	load_save()
 
 func save() -> void:
-	var gs: Node = get_node("/root/GameState")
+	var gs := GameState
 	var crew_data: Array = []
 	for entry: Dictionary in gs.crew:
 		var gear_data: Array = []
@@ -36,7 +36,7 @@ func save() -> void:
 		f.close()
 
 func load_save() -> void:
-	var gs: Node = get_node("/root/GameState")
+	var gs := GameState
 	gs.credits = STARTING_CREDITS
 	gs.vanguard_rank = 1
 	gs.crew = []

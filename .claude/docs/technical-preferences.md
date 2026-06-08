@@ -7,12 +7,12 @@
 - **Physics**: Not used â€” grid-based movement only
 
 ## Input & Platform
-- **Target Platforms**: PC (Windows primary)
-- **Input Methods**: Keyboard / Mouse
-- **Primary Input**: Mouse (left-click for all grid interaction)
+- **Target Platforms**: Mobile only (Android / iOS)
+- **Input Methods**: Touch (single tap)
+- **Primary Input**: Tap — all grid interaction and UI buttons are tap-driven
 - **Gamepad Support**: None
-- **Touch Support**: None
-- **Platform Notes**: 1280x720 locked viewport, no pan/zoom, orthographic
+- **Touch Support**: Required. Tap = select/move/attack/target; on-screen buttons for all actions. No keyboard/mouse assumptions.
+- **Platform Notes**: 1280x720 design resolution, no pan/zoom, orthographic. Touch targets should be large enough for a thumb; a full mobile HUD relayout is still pending (current HUD is a right-column carryover from the PC layout).
 
 ## Naming Conventions
 - **Classes**: PascalCase with class_name (CombatResolver, GridManager)

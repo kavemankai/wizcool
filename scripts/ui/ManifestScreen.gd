@@ -13,7 +13,7 @@ func _ready() -> void:
 	vbox.set_size(Vector2(520, 600))
 	add_child(vbox)
 
-	var gs: Node = get_node("/root/GameState")
+	var gs := GameState
 	var camp := CampaignData.get_campaign(gs.current_campaign_id)
 	var mission_count := CampaignData.get_mission_count(gs.current_campaign_id)
 	var mission := CampaignData.get_mission(gs.current_campaign_id, gs.current_mission_index)
@@ -37,7 +37,8 @@ func _ready() -> void:
 
 	var btn := Button.new()
 	btn.text = "BEGIN MISSION"
-	btn.custom_minimum_size = Vector2(0, 40)
+	btn.custom_minimum_size = Vector2(0, 72)
+	btn.add_theme_font_size_override("font_size", 24)
 	btn.pressed.connect(_on_begin)
 	vbox.add_child(btn)
 

@@ -17,7 +17,6 @@ const LINE_COLOR          := Color(0.22, 0.25, 0.30, 0.55)
 const MOVE_HIGHLIGHT      := Color(0.25, 0.60, 0.25, 0.35)
 const ATTACK_HIGHLIGHT    := Color(0.75, 0.18, 0.18, 0.40)
 const WARNING_HIGHLIGHT   := Color(0.90, 0.80, 0.10, 0.45)
-const EXTRACT_HIGHLIGHT   := Color(0.10, 0.80, 0.60, 0.55)
 
 var tiles: Array = []
 # Cover tier per cell: key = "x,y" string, value = int (1=LIGHT, 2=HEAVY, 0/absent=none)
@@ -26,10 +25,14 @@ var _move_highlights: Array[GridPos] = []
 var _attack_highlights: Array[GridPos] = []
 var _warning_tiles: Array[GridPos] = []
 var _extraction_tile: GridPos = null
-var _extract_time: float = 0.0
+var _extract_overlay: ExtractionPulse = null
 
 func _ready() -> void:
 	_init_tiles()
+	# Pulsing extraction marker lives in its own canvas item so the static
+	# board is not redrawn every frame just to animate one tile.
+	_extract_overlay = ExtractionPulse.new()
+	add_child(_extract_overlay)
 	queue_redraw()
 
 func load_map(map_id: String) -> void:
@@ -43,11 +46,6 @@ func load_map(map_id: String) -> void:
 			push_warning("GridManager: unknown map_id '%s', loading prototype" % map_id)
 			_place_map_prototype()
 	queue_redraw()
-
-func _process(delta: float) -> void:
-	if _extraction_tile != null:
-		_extract_time += delta
-		queue_redraw()
 
 func _init_tiles() -> void:
 	tiles.resize(GRID_WIDTH)
@@ -210,15 +208,6 @@ func _draw() -> void:
 	for pos in _warning_tiles:
 		draw_rect(Rect2(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE), WARNING_HIGHLIGHT)
 
-	if _extraction_tile != null:
-		var pulse := sin(_extract_time * 2.8) * 0.18 + 0.48
-		var ecol := EXTRACT_HIGHLIGHT
-		ecol.a = pulse
-		draw_rect(
-			Rect2(_extraction_tile.x * TILE_SIZE, _extraction_tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE),
-			ecol
-		)
-
 func get_tile_type(pos: GridPos) -> int:
 	if not is_in_bounds(pos):
 		return TileType.WALL
@@ -266,7 +255,7 @@ func get_warning_tiles() -> Array[GridPos]:
 
 func set_extraction_tile(pos: GridPos) -> void:
 	_extraction_tile = pos
-	queue_redraw()
+	_extract_overlay.set_tile(pos, TILE_SIZE)
 
 func is_hazard_warned(pos: GridPos) -> bool:
 	for p in _warning_tiles:

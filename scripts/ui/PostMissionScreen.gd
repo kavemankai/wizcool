@@ -13,7 +13,7 @@ func _ready() -> void:
 	vbox.set_size(Vector2(520, 600))
 	add_child(vbox)
 
-	var gs: Node = get_node("/root/GameState")
+	var gs := GameState
 	var result: Dictionary = gs.last_mission_result
 	var success: bool = result.get("success", false)
 	var campaign_complete: bool = result.get("campaign_complete", false)
@@ -59,13 +59,15 @@ func _ready() -> void:
 	if success:
 		var proceed_btn := Button.new()
 		proceed_btn.text = "PROCEED TO TERMINAL HUB"
-		proceed_btn.custom_minimum_size = Vector2(0, 40)
+		proceed_btn.custom_minimum_size = Vector2(0, 72)
+		proceed_btn.add_theme_font_size_override("font_size", 24)
 		proceed_btn.pressed.connect(_on_continue)
 		vbox.add_child(proceed_btn)
 	else:
 		var retry_btn := Button.new()
 		retry_btn.text = "RETRY MISSION"
-		retry_btn.custom_minimum_size = Vector2(0, 40)
+		retry_btn.custom_minimum_size = Vector2(0, 72)
+		retry_btn.add_theme_font_size_override("font_size", 24)
 		retry_btn.pressed.connect(_on_retry)
 		vbox.add_child(retry_btn)
 
@@ -78,7 +80,8 @@ func _ready() -> void:
 
 		var abandon_btn := Button.new()
 		abandon_btn.text = "ABANDON CAMPAIGN"
-		abandon_btn.custom_minimum_size = Vector2(0, 40)
+		abandon_btn.custom_minimum_size = Vector2(0, 72)
+		abandon_btn.add_theme_font_size_override("font_size", 24)
 		abandon_btn.pressed.connect(_on_abandon)
 		vbox.add_child(abandon_btn)
 
@@ -102,8 +105,8 @@ func _on_retry() -> void:
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
 
 func _on_abandon() -> void:
-	var gs: Node = get_node("/root/GameState")
-	var sm: Node = get_node("/root/SaveManager")
+	var gs := GameState
+	var sm := SaveManager
 	for entry: Dictionary in gs.crew:
 		for item: Dictionary in entry.get("gear", []):
 			if item.get("state", GearItem.GearState.INTACT) == GearItem.GearState.INTACT:

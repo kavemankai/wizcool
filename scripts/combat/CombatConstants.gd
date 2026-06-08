@@ -39,6 +39,13 @@ const CORROSIVE_BURST_DAMAGE: int = 2
 const ARC_SUPPRESSOR_RANGE: int = 4
 const SEALANT_PACK_RANGE: int = 3
 
+# Arc Pulse — chains SUPPRESSED to enemies within this radius of the primary target
+const ARC_PULSE_DAMAGE: int = 1
+const ARC_PULSE_CHAIN_RADIUS: int = 1
+
+# Brace — flat reduction applied to the next incoming hit while braced
+const BRACE_DAMAGE_REDUCTION: int = 2
+
 # AI scoring thresholds
 const AI_AOE_MIN_SCORE: int = 2
 const AI_PRECISION_WEIGHT: int = 3
