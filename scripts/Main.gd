@@ -1,7 +1,7 @@
 extends Node2D
 
 enum GamePhase { PLAYER_TURN, ENEMY_TURN, GAME_OVER }
-enum InputState { IDLE, ACTING }
+enum InputState { IDLE, ACTING, ABILITY_TARGETING }
 
 const ROUND_LIMIT: int = 20
 
@@ -49,6 +49,7 @@ func _ready() -> void:
 	hud.end_turn_pressed.connect(_on_end_turn)
 	hud.field_patch_pressed.connect(_on_field_patch)
 	hud.skip_pressed.connect(func() -> void: _skip_requested = true)
+	hud.ability_pressed.connect(_on_ability_pressed)
 	hud.cutaway_toggled.connect(func(on: bool) -> void: _show_cutaway = on)
 	hud.debug_toggled.connect(func(on: bool) -> void: _debug_mode = on)
 
@@ -301,6 +302,23 @@ func _handle_click(click_pos: Vector2) -> void:
 			else:
 				_enter_idle()
 
+		InputState.ABILITY_TARGETING:
+			if clicked_unit != null and not clicked_unit.is_player \
+					and not clicked_unit.is_downed and _can_attack(active_unit, clicked_unit):
+				_do_ability(active_unit, clicked_unit)
+				if game_phase == GamePhase.GAME_OVER:
+					_enter_idle()
+					return
+				input_state = InputState.ACTING
+				_refresh_highlights()
+				if not active_unit.can_act():
+					_enter_idle()
+			else:
+				# Tapped a non-target — cancel ability targeting, back to ACTING.
+				hud.log("ABILITY CANCELLED")
+				input_state = InputState.ACTING
+				_refresh_highlights()
+
 # ---------------------------------------------------------------------------
 # Selection & highlights
 # ---------------------------------------------------------------------------
@@ -323,6 +341,7 @@ func _enter_idle() -> void:
 	grid_manager.clear_all_highlights()
 	hud.show_unit(null)
 	hud.set_field_patch_visible(false)
+	hud.set_ability_visible(false)
 	hud.set_precision_indicator(false)
 	input_state = InputState.IDLE
 
@@ -355,6 +374,10 @@ func _refresh_highlights() -> void:
 
 	hud.show_unit(active_unit)
 	hud.set_field_patch_visible(_can_field_patch(active_unit))
+	if _can_use_ability(active_unit):
+		hud.set_ability_visible(true, _get_unit_special(active_unit).get_label())
+	else:
+		hud.set_ability_visible(false)
 
 func _is_move_tile(pos: GridPos) -> bool:
 	for t in move_tiles:
@@ -461,6 +484,118 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 			_on_mission_fail("LEADER DOWNED")
 		else:
 			_check_game_over()
+
+# ---------------------------------------------------------------------------
+# Weapon special abilities (player-activated)
+# ---------------------------------------------------------------------------
+
+## Returns the equipped weapon's WeaponSpecial, or null if none.
+func _get_unit_special(unit: Unit) -> WeaponSpecial:
+	if unit == null:
+		return null
+	for item: GearItem in unit.gear:
+		if item.slot == "weapon" and item.special != null:
+			return item.special
+	return null
+
+## True when the unit can fire its weapon special right now.
+func _can_use_ability(unit: Unit) -> bool:
+	if unit == null or not unit.is_player or unit.has_attacked:
+		return false
+	if unit.has_status(StatusEffect.Type.OVERLOADED):
+		return false
+	var sp := _get_unit_special(unit)
+	return sp != null and sp.is_ready()
+
+## ABILITY button pressed. Self-target abilities fire immediately; targeted
+## abilities enter ABILITY_TARGETING so the player taps a valid enemy.
+func _on_ability_pressed() -> void:
+	if active_unit == null or not _can_use_ability(active_unit):
+		return
+	var sp := _get_unit_special(active_unit)
+	if sp.type == WeaponSpecial.SpecialType.BRACE:
+		_do_brace(active_unit, sp)
+		_refresh_highlights()
+		if not active_unit.can_act():
+			_enter_idle()
+		return
+	# Targeted ability — highlight valid enemies and wait for a tap.
+	var targets: Array[GridPos] = []
+	for u in units:
+		if u.is_player or u.is_downed:
+			continue
+		if _can_attack(active_unit, u):
+			targets.append(u.grid_pos)
+	if targets.is_empty():
+		hud.log("NO TARGET IN RANGE FOR %s" % sp.get_label())
+		return
+	input_state = InputState.ABILITY_TARGETING
+	grid_manager.set_move_highlights([])
+	grid_manager.set_attack_highlights(targets)
+	hud.set_ability_visible(false)
+	hud.set_field_patch_visible(false)
+	hud.set_precision_indicator(false)
+	hud.log("SELECT TARGET — %s" % sp.get_label())
+
+## Dispatch a targeted ability against the tapped enemy.
+func _do_ability(attacker: Unit, target: Unit) -> void:
+	var sp := _get_unit_special(attacker)
+	if sp == null:
+		return
+	match sp.type:
+		WeaponSpecial.SpecialType.ARC_PULSE:
+			_do_arc_pulse(attacker, target, sp)
+		WeaponSpecial.SpecialType.CORROSIVE_BURST:
+			_do_corrosive_burst(attacker, target, sp)
+		_:
+			# SUPPRESSING_FIRE or any other targeted special: damage + suppress.
+			_do_arc_pulse(attacker, target, sp)
+	_resolve_post_action()
+
+func _do_arc_pulse(attacker: Unit, target: Unit, sp: WeaponSpecial) -> void:
+	var dmg := CombatConstants.ARC_PULSE_DAMAGE
+	CombatResolver.resolve_damage_ex(attacker, target, dmg, false, grid_manager)
+	CombatResolver.apply_status(target, StatusEffect.Type.SUPPRESSED)
+	var chained := 0
+	for u in units:
+		if u == target or u.is_player or u.is_downed:
+			continue
+		var d: int = maxi(absi(u.grid_pos.x - target.grid_pos.x), absi(u.grid_pos.y - target.grid_pos.y))
+		if d <= CombatConstants.ARC_PULSE_CHAIN_RADIUS:
+			CombatResolver.apply_status(u, StatusEffect.Type.SUPPRESSED)
+			chained += 1
+	attacker.has_attacked = true
+	sp.activate()
+	AudioManager.play_sfx("weapon_plasma_cutter")
+	var suffix := "  [+%d CHAINED]" % chained if chained > 0 else ""
+	hud.log("%s ARC PULSE → %s  -%d TGH  [SUPPRESSED]%s" % [
+		attacker.unit_id, target.unit_id, dmg, suffix])
+
+func _do_corrosive_burst(attacker: Unit, target: Unit, sp: WeaponSpecial) -> void:
+	var dmg := CombatConstants.CORROSIVE_BURST_DAMAGE
+	CombatResolver.resolve_damage_ex(attacker, target, dmg, false, grid_manager)
+	CombatResolver.apply_status(target, StatusEffect.Type.CORRODED)
+	attacker.has_attacked = true
+	sp.activate()
+	AudioManager.play_sfx("weapon_long_bore_drill")
+	hud.log("%s CORROSIVE BURST → %s  -%d TGH  [CORRODED]" % [
+		attacker.unit_id, target.unit_id, dmg])
+
+func _do_brace(unit: Unit, sp: WeaponSpecial) -> void:
+	sp.activate()  # sets is_braced + starts cooldown
+	unit.has_attacked = true
+	AudioManager.play_sfx("weapon_impact_wrench")
+	hud.log("%s BRACES — NEXT INCOMING HIT REDUCED BY %d" % [
+		unit.unit_id, CombatConstants.BRACE_DAMAGE_REDUCTION])
+
+## Flush downed units and resolve mission/game-over after an offensive action.
+func _resolve_post_action() -> void:
+	var leader_fell := _flush_downed()
+	if leader_fell:
+		hud.log("=== LEADER DOWN — MISSION FAILED ===")
+		_on_mission_fail("LEADER DOWNED")
+	else:
+		_check_game_over()
 
 # ---------------------------------------------------------------------------
 # Field Patch

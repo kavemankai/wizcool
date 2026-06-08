@@ -4,6 +4,7 @@ extends CanvasLayer
 signal end_turn_pressed
 signal field_patch_pressed
 signal skip_pressed
+signal ability_pressed
 signal cutaway_toggled(enabled: bool)
 signal debug_toggled(enabled: bool)
 
@@ -17,6 +18,7 @@ var _log_label: Label
 var _end_turn_btn: Button
 var _field_patch_btn: Button
 var _skip_btn: Button
+var _ability_btn: Button
 var _cutaway_btn: Button
 var _debug_btn: Button
 var _cutaway_on: bool = true
@@ -85,6 +87,29 @@ func _ready() -> void:
 		skip_pressed.emit())
 	root.add_child(_skip_btn)
 
+	# USE ABILITY — large touch target, shown only when the selected unit has a
+	# ready weapon special. Shares the enemy-phase SKIP slot is avoided by using
+	# its own row; highlighted so it reads as the primary tactical action.
+	_ability_btn = Button.new()
+	_ability_btn.set_position(Vector2(1100, 454))
+	_ability_btn.set_size(Vector2(172, 52))
+	_ability_btn.text = "USE ABILITY"
+	_ability_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_ability_btn.visible = false
+	_ability_btn.add_theme_color_override("font_color", Color(0.10, 0.06, 0.02))
+	_ability_btn.add_theme_color_override("font_hover_color", Color(0.10, 0.06, 0.02))
+	_ability_btn.add_theme_color_override("font_pressed_color", Color(0.10, 0.06, 0.02))
+	var ability_style := StyleBoxFlat.new()
+	ability_style.bg_color = Color(0.95, 0.80, 0.20)
+	ability_style.set_corner_radius_all(4)
+	_ability_btn.add_theme_stylebox_override("normal", ability_style)
+	_ability_btn.add_theme_stylebox_override("hover", ability_style)
+	_ability_btn.add_theme_stylebox_override("pressed", ability_style)
+	_ability_btn.pressed.connect(func() -> void:
+		AudioManager.play_sfx("ui_click")
+		ability_pressed.emit())
+	root.add_child(_ability_btn)
+
 	_cutaway_btn = Button.new()
 	_cutaway_btn.set_position(Vector2(1108, 512))
 	_cutaway_btn.set_size(Vector2(164, 38))
@@ -93,11 +118,11 @@ func _ready() -> void:
 	_cutaway_btn.pressed.connect(_on_cutaway_btn_pressed)
 	root.add_child(_cutaway_btn)
 
-	# Debug button sits ABOVE the cutaway toggle (was overlapping END TURN at
+	# Debug button sits at the top of the stack (was overlapping END TURN at
 	# y=656) and is only shown when GameState.DEBUG_MODE is enabled, so it can
-	# never obscure END TURN in a normal build.
+	# never obscure another button in a normal build.
 	_debug_btn = Button.new()
-	_debug_btn.set_position(Vector2(1108, 464))
+	_debug_btn.set_position(Vector2(1108, 408))
 	_debug_btn.set_size(Vector2(164, 38))
 	_debug_btn.text = "DEBUG: OFF"
 	_debug_btn.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -128,6 +153,12 @@ func set_field_patch_visible(show_btn: bool) -> void:
 
 func set_skip_visible(show_btn: bool) -> void:
 	_skip_btn.visible = show_btn
+
+## Show/hide the USE ABILITY button and set its label to the ability name.
+func set_ability_visible(show_btn: bool, label: String = "") -> void:
+	_ability_btn.visible = show_btn
+	if show_btn and label != "":
+		_ability_btn.text = label
 
 func _on_cutaway_btn_pressed() -> void:
 	_cutaway_on = not _cutaway_on

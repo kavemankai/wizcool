@@ -110,6 +110,13 @@ func has_status(type: StatusEffect.Type) -> bool:
 func get_effective_move() -> int:
 	return maxi(1, get_effective_speed() - status_effects.get_move_penalty())
 
+## True while a BRACE weapon special is active (reduces the next incoming hit).
+func is_braced() -> bool:
+	for item: GearItem in gear:
+		if item.slot == "weapon" and item.special != null and item.special.is_braced:
+			return true
+	return false
+
 ## Returns the gear state (int) of the equipped weapon, or INTACT if no weapon.
 ## Used by CoverSystem to determine whether cover effectiveness is penalised.
 func get_weapon_gear_state() -> int:
