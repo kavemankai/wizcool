@@ -129,9 +129,18 @@ func _ready() -> void:
 	_unit_label.add_theme_font_size_override("font_size", FS_UNIT)
 	_unit_label.add_theme_color_override("font_color", PARCHMENT)
 
-	# Preload crew portraits if they've been imported.
-	for pid: String in ["ALPHA", "BRAVO", "CHARLIE"]:
-		var ppath := "res://assets/portraits/portrait_player_%s.png" % pid.to_lower()
+	# Preload portraits (player crew + named Vanguard rival crew) if imported.
+	# Keyed by unit_id. SENTINEL/PRISONER are faceless types — no portrait.
+	var portrait_paths := {
+		"ALPHA": "res://assets/portraits/portrait_player_alpha.png",
+		"BRAVO": "res://assets/portraits/portrait_player_bravo.png",
+		"CHARLIE": "res://assets/portraits/portrait_player_charlie.png",
+		"VANGUARD-1": "res://assets/portraits/portrait_enemy_vanguard_leader.png",
+		"VANGUARD-2": "res://assets/portraits/portrait_enemy_vanguard_soldier.png",
+		"VANGUARD-3": "res://assets/portraits/portrait_enemy_vanguard_tech.png",
+	}
+	for pid: String in portrait_paths:
+		var ppath: String = portrait_paths[pid]
 		if ResourceLoader.exists(ppath):
 			_portraits[pid] = load(ppath)
 
@@ -330,8 +339,8 @@ func show_unit(unit: Unit) -> void:
 		_unit_label.position = Vector2(10, 8)
 		_unit_label.size = Vector2(220, 234)
 		return
-	# Crew portrait: show it and drop the stat text below; otherwise full panel.
-	if unit.is_player and _portraits.has(unit.unit_id):
+	# Portrait: show it and drop the stat text below; otherwise full panel.
+	if _portraits.has(unit.unit_id):
 		_unit_portrait.texture = _portraits[unit.unit_id]
 		_unit_portrait.visible = true
 		_unit_label.position = Vector2(10, 96)
