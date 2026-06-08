@@ -75,7 +75,8 @@ func _ready() -> void:
 
 	var depart_btn := Button.new()
 	depart_btn.text = "DEPART"
-	depart_btn.custom_minimum_size = Vector2(0, 40)
+	depart_btn.custom_minimum_size = Vector2(0, 72)
+	depart_btn.add_theme_font_size_override("font_size", 24)
 	depart_btn.pressed.connect(_on_depart)
 	vbox.add_child(depart_btn)
 
@@ -94,6 +95,7 @@ func _add_fence_row(parent: VBoxContainer, gear_item: GearItem) -> void:
 
 	var btn := Button.new()
 	btn.text = "FENCE"
+	btn.custom_minimum_size = Vector2(120, 64)
 	btn.pressed.connect(func() -> void:
 		_credits += FENCE_VALUE
 		_credits_label.text = str(_credits)
@@ -121,6 +123,7 @@ func _add_repair_row(parent: VBoxContainer, unit_id: String, item_data: Dictiona
 
 	var btn := Button.new()
 	btn.text = "REPAIR"
+	btn.custom_minimum_size = Vector2(120, 64)
 	btn.pressed.connect(func() -> void:
 		if _credits < REPAIR_COST:
 			lbl.text = lbl.text + "  [INSUFFICIENT FUNDS]"

@@ -59,13 +59,15 @@ func _ready() -> void:
 	if success:
 		var proceed_btn := Button.new()
 		proceed_btn.text = "PROCEED TO TERMINAL HUB"
-		proceed_btn.custom_minimum_size = Vector2(0, 40)
+		proceed_btn.custom_minimum_size = Vector2(0, 72)
+		proceed_btn.add_theme_font_size_override("font_size", 24)
 		proceed_btn.pressed.connect(_on_continue)
 		vbox.add_child(proceed_btn)
 	else:
 		var retry_btn := Button.new()
 		retry_btn.text = "RETRY MISSION"
-		retry_btn.custom_minimum_size = Vector2(0, 40)
+		retry_btn.custom_minimum_size = Vector2(0, 72)
+		retry_btn.add_theme_font_size_override("font_size", 24)
 		retry_btn.pressed.connect(_on_retry)
 		vbox.add_child(retry_btn)
 
@@ -78,7 +80,8 @@ func _ready() -> void:
 
 		var abandon_btn := Button.new()
 		abandon_btn.text = "ABANDON CAMPAIGN"
-		abandon_btn.custom_minimum_size = Vector2(0, 40)
+		abandon_btn.custom_minimum_size = Vector2(0, 72)
+		abandon_btn.add_theme_font_size_override("font_size", 24)
 		abandon_btn.pressed.connect(_on_abandon)
 		vbox.add_child(abandon_btn)
 

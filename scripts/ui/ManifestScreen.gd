@@ -37,7 +37,8 @@ func _ready() -> void:
 
 	var btn := Button.new()
 	btn.text = "BEGIN MISSION"
-	btn.custom_minimum_size = Vector2(0, 40)
+	btn.custom_minimum_size = Vector2(0, 72)
+	btn.add_theme_font_size_override("font_size", 24)
 	btn.pressed.connect(_on_begin)
 	vbox.add_child(btn)
 
