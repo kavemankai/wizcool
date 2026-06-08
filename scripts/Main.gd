@@ -46,7 +46,7 @@ func _ready() -> void:
 	hud.cutaway_toggled.connect(func(on: bool) -> void: _show_cutaway = on)
 	hud.debug_toggled.connect(func(on: bool) -> void: _debug_mode = on)
 
-	var gs: Node = get_node("/root/GameState")
+	var gs := GameState
 	_mission = CampaignData.get_mission(gs.current_campaign_id, gs.current_mission_index)
 	_objective_type = _mission.get("objective", CampaignData.ObjectiveType.EXTRACTION)
 	_objective_data = _mission.get("objective_data", {})
@@ -84,7 +84,7 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 func _spawn_units_from_mission() -> void:
-	var saved_gear: Array = get_node("/root/GameState").crew
+	var saved_gear: Array = GameState.crew
 	var player_spawns: Array = _mission.get("player_spawns", [])
 
 	var alpha_pos := _get_spawn_pos(player_spawns, "ALPHA",   Vector2i(5, 17))
@@ -706,8 +706,8 @@ func _on_mission_success() -> void:
 	AudioManager.play_sfx("mission_complete")
 	for u in _get_player_units():
 		_archive_unit(u)
-	var gs: Node = get_node("/root/GameState")
-	var sm: Node = get_node("/root/SaveManager")
+	var gs := GameState
+	var sm := SaveManager
 	gs.crew = _build_crew_snapshot()
 	gs.pending_loot = dropped_loot
 
@@ -747,8 +747,8 @@ func _on_mission_fail(reason: String) -> void:
 	AudioManager.play_sfx("mission_fail")
 	for u in _get_player_units():
 		_archive_unit(u)
-	var gs: Node = get_node("/root/GameState")
-	var sm: Node = get_node("/root/SaveManager")
+	var gs := GameState
+	var sm := SaveManager
 	gs.crew = _build_crew_snapshot()
 	gs.pending_loot = dropped_loot
 	# Gear fracture and rank change happen ONLY on Abandon (handled in PostMissionScreen)

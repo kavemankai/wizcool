@@ -17,8 +17,8 @@ func _ready() -> void:
 	bg.color = Color(0.03, 0.03, 0.04)
 	add_child(bg)
 
-	_gs = get_node("/root/GameState")
-	_sm = get_node("/root/SaveManager")
+	_gs = GameState
+	_sm = SaveManager
 	_credits = _gs.credits
 	_all_crew_gear = _gs.crew
 

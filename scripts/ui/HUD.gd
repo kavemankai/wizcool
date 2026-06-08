@@ -93,11 +93,15 @@ func _ready() -> void:
 	_cutaway_btn.pressed.connect(_on_cutaway_btn_pressed)
 	root.add_child(_cutaway_btn)
 
+	# Debug button sits ABOVE the cutaway toggle (was overlapping END TURN at
+	# y=656) and is only shown when GameState.DEBUG_MODE is enabled, so it can
+	# never obscure END TURN in a normal build.
 	_debug_btn = Button.new()
-	_debug_btn.set_position(Vector2(1108, 656))
+	_debug_btn.set_position(Vector2(1108, 464))
 	_debug_btn.set_size(Vector2(164, 38))
 	_debug_btn.text = "DEBUG: OFF"
 	_debug_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_debug_btn.visible = GameState.DEBUG_MODE
 	_debug_btn.pressed.connect(_on_debug_btn_pressed)
 	root.add_child(_debug_btn)
 

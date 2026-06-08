@@ -1,7 +1,8 @@
-class_name AudioManager
 extends Node
 
 ## AudioManager — autoload singleton for all SFX and music playback.
+## No class_name: the autoload registration already exposes `AudioManager`
+## as a global, and a matching class_name would hide the autoload singleton.
 ## Owns all AudioStreamPlayer nodes. No game logic lives here.
 ## Streams are null until .wav assets arrive; all play calls guard for null.
 
