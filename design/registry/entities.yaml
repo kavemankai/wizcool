@@ -1,0 +1,376 @@
+# Game World Entity Registry
+#
+# PURPOSE: Single source of truth for all named game-world facts that appear
+# in more than one document. Skills check this before writing new content to
+# detect cross-doc inconsistencies at authoring time.
+#
+# RULES:
+#   - Only register facts that cross system boundaries. Internal-only facts
+#     (a formula used in one GDD only) do NOT need to be registered.
+#   - Never delete entries — set status: deprecated instead.
+#   - When a value changes: update the value, set revised: to today's date,
+#     and add a comment with the old value and which GDD changed it.
+#   - source: is the authoritative GDD — the one that "owns" this fact.
+#     Other GDDs that reference it list themselves in referenced_by.
+#   - When a new GDD references an existing entry, append its path to
+#     referenced_by. Do not create a duplicate entry.
+#
+# WRITTEN BY: /design-system (Phase 5 — after GDD sections are approved)
+#             /consistency-check (when resolving conflicts)
+# READ BY:    /design-system (Phase 2 — before authoring begins, and after
+#               Section C/D writes to conflict-check new entities/formulas)
+#             /consistency-check (primary input — grep-first, GDD-second)
+#             /review-all-gdds (Phase 1 — baseline for Phase 2 checks)
+#             /architecture-review (data structure and interface validation)
+#
+# SEARCH PATTERNS (for skills using Grep):
+#   All entity names:        Grep pattern="^  - name:" path="design/registry/entities.yaml"
+#   Specific entity:         Grep pattern="  - name: goblin" path="design/registry/entities.yaml"
+#   All items:               Grep pattern="^  - name:" path="design/registry/entities.yaml" (items section)
+#   What combat.md owns:     Grep pattern="source: design/gdd/combat.md"
+#   What inventory.md uses:  Grep pattern="referenced_by.*inventory"
+#   All gold values:          Grep pattern="value_gold:"
+#   Deprecated entries:      Grep pattern="status: deprecated"
+#
+# FORMAT: YAML. Consistent indentation is critical for grep reliability.
+#   Sections: entities | items | formulas | constants
+#   Each entry: name, status, source, referenced_by[], attributes{}, added, revised
+
+version: 1
+last_updated: "2026-06-08"
+
+# ─── ENTITIES ────────────────────────────────────────────────────────────────
+# Named game-world objects: enemies, NPCs, characters, factions, bosses.
+# Register an entity here when it appears in more than one GDD — e.g., an
+# enemy defined in combat.md that also drops items listed in inventory.md.
+#
+# Required fields: name, status, source, referenced_by, added
+# Attribute fields: any key stats that could appear in another GDD
+#   (health, damage, drops, faction, etc.)
+
+entities:
+  - name: ALPHA
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: [design/gdd/combat.md, design/gdd/mission.md]
+    faction: player
+    is_leader: true
+    toughness: 6
+    combat_skill: 2
+    speed: 3
+    attack_range: 4
+    gear: [PLASMA-CUTTER, FIELD-PATCH-KIT]
+    spawn: [5, 17]
+    added: "2026-06-07"
+
+  - name: BRAVO
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: [design/gdd/combat.md]
+    faction: player
+    is_leader: false
+    toughness: 5
+    combat_skill: 2
+    speed: 4
+    attack_range: 2
+    gear: [IMPACT-WRENCH, WORK-HARNESS]
+    spawn: [3, 16]
+    added: "2026-06-07"
+
+  - name: CHARLIE
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: [design/gdd/combat.md]
+    faction: player
+    is_leader: false
+    toughness: 4
+    combat_skill: 3
+    speed: 3
+    attack_range: 5
+    gear: [LONG-BORE-DRILL]
+    spawn: [7, 16]
+    added: "2026-06-07"
+
+  - name: SENTINEL
+    status: active
+    source: design/gdd/ai.md
+    referenced_by: [design/gdd/combat.md]
+    faction: enemy
+    archetype: GUARDIAN
+    toughness: 4
+    combat_skill: 2
+    speed: 2
+    attack_range: 2
+    zone: {min_row: 8, max_row: 12}
+    count: 2
+    added: "2026-06-07"
+
+  - name: PRISONER
+    status: active
+    source: design/gdd/ai.md
+    referenced_by: [design/gdd/combat.md]
+    faction: enemy
+    archetype: RAMPAGING
+    toughness: 3
+    combat_skill: 2
+    speed: 4
+    attack_range: 1
+    count: 2
+    added: "2026-06-07"
+
+  - name: VANGUARD
+    status: active
+    source: design/gdd/rival.md
+    referenced_by: [design/gdd/combat.md, design/gdd/gear-economy.md]
+    faction: enemy
+    archetype: TACTICAL
+    toughness: 5
+    combat_skill: 2
+    speed: 2
+    attack_range: 3
+    zone: {min_row: 14, max_row: 18}
+    count: "2 (rank 1) or 3 (rank 2+)"
+    gear_scaling: "BALLISTIC-PLATE at rank>=2, VANGUARD-MEDKIT at rank>=3"
+    added: "2026-06-07"
+
+# Example (remove when first real entry is added):
+#
+# entities:
+#   - name: goblin
+#     status: active              # active | deprecated
+#     source: design/gdd/combat.md
+#     referenced_by:
+#       - design/gdd/combat.md
+#       - design/gdd/inventory.md
+#     health: 40
+#     damage: 8
+#     drops:
+#       - item: goblin_arm        # must match an entry in items section
+#         qty: 1
+#         drop_rate: 0.8          # 0.0–1.0
+#     added: 2026-03-26
+#     revised: ""
+
+
+# ─── ITEMS ───────────────────────────────────────────────────────────────────
+# Named collectables, equipment, consumables, crafting materials, currency.
+# Register an item when its name or value appears in more than one GDD.
+#
+# Required fields: name, status, source, referenced_by, added
+# Attribute fields: value_gold, weight, stackable, category, and any stat
+#   modifiers that another system (e.g., economy, crafting) might reference.
+
+items:
+  - name: PLASMA-CUTTER
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: [design/gdd/combat.md]
+    slot: weapon
+    stat_target: combat_skill
+    modifier: 2
+    damage: 3
+    notes: "ALPHA's weapon. Starts FRACTURED each mission."
+    added: "2026-06-07"
+
+  - name: IMPACT-WRENCH
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: []
+    slot: weapon
+    stat_target: combat_skill
+    modifier: 1
+    damage: 2
+    added: "2026-06-07"
+
+  - name: LONG-BORE-DRILL
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: []
+    slot: weapon
+    stat_target: combat_skill
+    modifier: 1
+    damage: 2
+    added: "2026-06-07"
+
+  - name: WORK-HARNESS
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: [design/gdd/combat.md]
+    slot: armor
+    stat_target: speed
+    modifier: 1
+    added: "2026-06-07"
+
+  - name: FIELD-PATCH-KIT
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: [design/gdd/combat.md]
+    slot: medical
+    notes: "Consumed on use. Enables Field Patch action."
+    added: "2026-06-07"
+
+  - name: SALVAGE-PISTOL
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: [design/gdd/combat.md]
+    slot: weapon
+    stat_target: combat_skill
+    modifier: 1
+    damage: 2
+    notes: "Vanguard weapon. Drops as loot on GEAR_BROKEN result."
+    added: "2026-06-07"
+
+  - name: BALLISTIC-PLATE
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: [design/gdd/rival.md]
+    slot: armor
+    stat_target: speed
+    modifier: 1
+    notes: "VANGUARD-2 only, at vanguard_rank >= 2."
+    added: "2026-06-07"
+
+# Example:
+#
+# items:
+#   - name: goblin_arm
+#     status: active
+#     source: design/gdd/combat.md   # drop defined in combat GDD
+#     referenced_by:
+#       - design/gdd/combat.md
+#       - design/gdd/inventory.md    # inventory GDD lists its weight/stack rules
+#       - design/gdd/economy.md      # economy GDD references its sell price
+#     value_gold: 5
+#     weight: 1
+#     stackable: true
+#     category: crafting_material
+#     added: 2026-03-26
+#     revised: ""
+
+
+# ─── FORMULAS ────────────────────────────────────────────────────────────────
+# Named calculations with defined variables and output ranges.
+# Register a formula when its output feeds into another system's input,
+# or when another GDD references it by name.
+#
+# Required fields: name, status, source, referenced_by, variables[],
+#   output_range[min, max], added
+# Optional: expression (the actual formula), notes
+
+formulas:
+  - name: damage_cascade
+    status: active
+    source: design/gdd/combat.md
+    referenced_by: [design/gdd/gear-economy.md, design/gdd/combat-cutaway.md]
+    variables: [toughness, dmg, gear_slots]
+    expression: "toughness -= dmg; if toughness<=0 fracture intact gear (armor first, weapon second); if no intact gear break fractured gear; if nothing break -> DOWNED"
+    output_range: [NORMAL, GEAR_FRACTURED, GEAR_BROKEN, DOWNED]
+    added: "2026-06-07"
+
+  - name: chebyshev_distance
+    status: active
+    source: design/gdd/combat.md
+    referenced_by: [design/gdd/ai.md, design/gdd/combat-cutaway.md]
+    variables: [ax, ay, tx, ty]
+    expression: "max(abs(ax - tx), abs(ay - ty))"
+    notes: "Used for both attack range check and melee/ranged detection in cutaway."
+    added: "2026-06-07"
+
+  - name: effective_modifier
+    status: active
+    source: design/gdd/gear-economy.md
+    referenced_by: [design/gdd/combat.md]
+    variables: [modifier, state, patched_this_mission]
+    expression: "INTACT: modifier | FRACTURED+patched: modifier/2 | FRACTURED: 0 | BROKEN: 0"
+    added: "2026-06-07"
+
+# Example:
+#
+# formulas:
+#   - name: damage_formula
+#     status: active
+#     source: design/gdd/combat.md
+#     referenced_by:
+#       - design/gdd/combat.md
+#       - design/gdd/progression.md   # progression GDD scales attack variable
+#     variables:
+#       - attack
+#       - defense
+#       - crit_chance
+#       - crit_multiplier
+#     output_range: [0, 999]
+#     expression: "max(0, attack - defense) * (1 + crit_chance * crit_multiplier)"
+#     notes: "Output feeds into health-system damage intake. Min is 0 (armour
+#       can absorb all damage). Max is uncapped in formula but tuning knob
+#       damage_cap in combat.md clamps at 999."
+#     added: 2026-03-26
+#     revised: ""
+
+
+# ─── CONSTANTS ───────────────────────────────────────────────────────────────
+# Named numerical values referenced across multiple systems.
+# Register a constant when it is defined in one GDD but another GDD must
+# agree with it (e.g., gold carry limit defined in economy but checked in
+# inventory, or base inventory slots defined in inventory but displayed in HUD).
+#
+# Required fields: name, status, source, referenced_by, value, unit, added
+
+constants:
+  - name: ROUND_LIMIT
+    status: active
+    source: design/gdd/mission.md
+    referenced_by: [design/gdd/combat.md]
+    value: 20
+    unit: rounds
+    added: "2026-06-07"
+
+  - name: DANGER_PAY
+    status: active
+    source: design/gdd/mission.md
+    referenced_by: [design/gdd/hub.md, design/gdd/gear-economy.md]
+    value: 150
+    unit: credits
+    added: "2026-06-07"
+    revised: "2026-06-08"  # gear-economy.md added to referenced_by (tuning knobs section)
+
+  - name: HAZARD_DAMAGE
+    status: active
+    source: design/gdd/hazards.md
+    referenced_by: [design/gdd/combat.md]
+    value: 2
+    unit: toughness
+    added: "2026-06-07"
+
+  - name: EXTRACTION_TILE
+    status: active
+    source: design/gdd/mission.md
+    referenced_by: [design/gdd/combat.md]
+    value: "[5, 2]"
+    unit: grid_pos
+    added: "2026-06-07"
+
+# Example:
+#
+# constants:
+#   - name: gold_carry_limit
+#     status: active
+#     source: design/gdd/economy.md
+#     referenced_by:
+#       - design/gdd/economy.md
+#       - design/gdd/inventory.md   # inventory enforces the carry limit
+#       - design/gdd/ui.md          # HUD displays current gold vs limit
+#     value: 9999
+#     unit: gold
+#     added: 2026-03-26
+#     revised: ""
+#
+#   - name: base_inventory_slots
+#     status: active
+#     source: design/gdd/inventory.md
+#     referenced_by:
+#       - design/gdd/inventory.md
+#       - design/gdd/progression.md  # progression unlocks additional slots
+#     value: 20
+#     unit: slots
+#     added: 2026-03-26
+#     revised: ""
