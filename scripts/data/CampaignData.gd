@@ -77,10 +77,14 @@ static func _cb_1() -> Dictionary:
 				"gear": [],
 			},
 		],
+		# Vanguard are held back and cut in from the tip (top) of the site on
+		# round 3 — they guard the evidence locker rather than backstabbing the
+		# crew at the start line.
+		"vanguard_spawn_turn": 3,
 		"vanguard_spawns": [
-			{"pos": Vector2i(3, 18), "zone_min": 14, "zone_max": 18},
-			{"pos": Vector2i(8, 18), "zone_min": 14, "zone_max": 18},
-			{"pos": Vector2i(6, 18), "zone_min": 14, "zone_max": 18},
+			{"pos": Vector2i(3, 1), "zone_min": 1, "zone_max": 6},
+			{"pos": Vector2i(8, 1), "zone_min": 1, "zone_max": 6},
+			{"pos": Vector2i(6, 1), "zone_min": 1, "zone_max": 6},
 		],
 	}
 

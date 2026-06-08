@@ -24,6 +24,12 @@ var _skip_requested: bool = false
 var _show_cutaway: bool = true
 var _debug_mode: bool = false
 
+# Vanguard reinforcement timing. A mission may defer the Vanguard so they
+# arrive mid-mission instead of at the start. vanguard_spawn_turn <= 1 means
+# they deploy immediately (the default for most missions).
+var _vanguard_spawn_turn: int = 1
+var _vanguard_deployed: bool = false
+
 # unit_id → {is_leader: bool, gear: [{item_id, slot, state: int (GearState enum)}]}
 var _gear_archive: Dictionary = {}
 
@@ -119,7 +125,10 @@ func _spawn_units_from_mission() -> void:
 	for ec: Dictionary in _mission.get("enemy_config", []):
 		_spawn_enemy_from_config(ec)
 
-	_spawn_vanguard()
+	_vanguard_spawn_turn = _mission.get("vanguard_spawn_turn", 1)
+	if _vanguard_spawn_turn <= 1:
+		_spawn_vanguard()
+		_vanguard_deployed = true
 
 func _get_spawn_pos(spawns: Array, unit_id: String, default_pos: Vector2i) -> Vector2i:
 	for s: Dictionary in spawns:
@@ -635,6 +644,13 @@ func _run_enemy_phase() -> void:
 			if u.is_player:
 				u.tick_turn_start()
 			u.queue_redraw()
+
+	# Deferred Vanguard reinforcements — they cut in from the tip of the map
+	# on their scheduled round (e.g. cb-1 arrivals on round 3).
+	if not _vanguard_deployed and round_number >= _vanguard_spawn_turn:
+		_spawn_vanguard()
+		_vanguard_deployed = true
+		hud.log("[VANGUARD SALVAGE CO. // REINFORCEMENTS INBOUND — TOP OF SITE]")
 
 	var next_zone := hazard_manager.get_active_zone(round_number)
 	if next_zone.size() > 0:
