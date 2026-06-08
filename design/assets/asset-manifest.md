@@ -6,19 +6,23 @@
 
 | Total | Needed | In Progress | Done | Approved |
 |-------|--------|-------------|------|----------|
-| 34 | 0 | 0 | 0 | 34 |
+| 36 | 0 | 0 | 6 | 36 |
+
+> Done = 6 portraits delivered as placeholders (player crew + Vanguard rival crew).
 
 ## Assets by Context
 
 ### Portraits: All Characters
 | Asset ID | Name | Category | Status | Spec File |
 |----------|------|----------|--------|-----------|
-| ASSET-001 | portrait_player_alpha.png | Portrait | Approved | design/assets/specs/portrait-assets.md |
-| ASSET-002 | portrait_player_bravo.png | Portrait | Approved | design/assets/specs/portrait-assets.md |
-| ASSET-003 | portrait_player_charlie.png | Portrait | Approved | design/assets/specs/portrait-assets.md |
-| ASSET-004 | portrait_enemy_sentinel.png | Portrait | Approved | design/assets/specs/portrait-assets.md |
-| ASSET-005 | portrait_enemy_prisoner.png | Portrait | Approved | design/assets/specs/portrait-assets.md |
-| ASSET-006 | portrait_enemy_vanguard.png | Portrait | Approved | design/assets/specs/portrait-assets.md |
+| ASSET-001 | portrait_player_alpha.png | Portrait | Done (placeholder) | design/assets/specs/portrait-assets.md |
+| ASSET-002 | portrait_player_bravo.png | Portrait | Done (placeholder) | design/assets/specs/portrait-assets.md |
+| ASSET-003 | portrait_player_charlie.png | Portrait | Done (placeholder) | design/assets/specs/portrait-assets.md |
+| ASSET-004 | portrait_enemy_sentinel.png | Portrait | Approved (not produced) | design/assets/specs/portrait-assets.md |
+| ASSET-005 | portrait_enemy_prisoner.png | Portrait | Approved (not produced) | design/assets/specs/portrait-assets.md |
+| ASSET-006 | portrait_enemy_vanguard_leader.png | Portrait | Done (placeholder) | design/assets/specs/portrait-assets.md |
+| ASSET-035 | portrait_enemy_vanguard_soldier.png | Portrait | Done (placeholder) | design/assets/specs/portrait-assets.md |
+| ASSET-036 | portrait_enemy_vanguard_tech.png | Portrait | Done (placeholder) | design/assets/specs/portrait-assets.md |
 
 ### Equipment Cards
 | Asset ID | Name | Category | Status | Spec File |
