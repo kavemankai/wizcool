@@ -163,7 +163,9 @@ func _spawn_vanguard() -> void:
 	var vspawns: Array = _mission.get("vanguard_spawns", [])
 	if vspawns.is_empty():
 		return
-	var count := 2 if rival_rank == 1 else 3
+	# Default escalates with Vanguard rank; a mission may cap it via vanguard_count.
+	var default_count := 2 if rival_rank == 1 else 3
+	var count: int = _mission.get("vanguard_count", default_count)
 	var to_spawn := mini(count, vspawns.size())
 	for i in to_spawn:
 		var vs: Dictionary = vspawns[i]
