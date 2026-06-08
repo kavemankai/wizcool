@@ -20,10 +20,15 @@ config/features=PackedStringArray("4.6")
 config/icon="res://icon.svg"
 config/run/main_scene="res://scenes/ui/ManifestScreen.tscn"
 
+[audio]
+
+buses/default_bus_layout="res://default_bus_layout.tres"
+
 [autoload]
 
 GameState="*res://scripts/data/GameState.gd"
 SaveManager="*res://scripts/data/SaveManager.gd"
+AudioManager="*res://scripts/systems/AudioManager.gd"
 
 [display]
 

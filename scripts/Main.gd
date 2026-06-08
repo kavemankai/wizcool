@@ -93,6 +93,7 @@ func _spawn_units_from_mission() -> void:
 
 	var alpha := _make_unit("ALPHA", true, true, 6, 2, 3, 4)
 	alpha.gear.append(GearItem.make_weapon("PLASMA-CUTTER", 2, 3))
+	alpha.gear.back().special = WeaponSpecial.make(WeaponSpecial.SpecialType.ARC_PULSE)
 	alpha.gear.append(GearItem.make_medical_kit("FIELD-PATCH-KIT"))
 	_place(alpha, GridPos.new(alpha_pos.x, alpha_pos.y))
 	_apply_saved_gear(alpha, saved_gear)
@@ -102,6 +103,7 @@ func _spawn_units_from_mission() -> void:
 
 	var bravo := _make_unit("BRAVO", true, false, 5, 2, 4, 2)
 	bravo.gear.append(GearItem.make_weapon("IMPACT-WRENCH", 1, 2))
+	bravo.gear.back().special = WeaponSpecial.make(WeaponSpecial.SpecialType.BRACE)
 	bravo.gear.append(GearItem.make_armor("WORK-HARNESS", 1))
 	_place(bravo, GridPos.new(bravo_pos.x, bravo_pos.y))
 	_apply_saved_gear(bravo, saved_gear)
@@ -109,6 +111,7 @@ func _spawn_units_from_mission() -> void:
 
 	var charlie := _make_unit("CHARLIE", true, false, 4, 3, 3, 5)
 	charlie.gear.append(GearItem.make_weapon("LONG-BORE-DRILL", 1, 2))
+	charlie.gear.back().special = WeaponSpecial.make(WeaponSpecial.SpecialType.CORROSIVE_BURST)
 	_place(charlie, GridPos.new(charlie_pos.x, charlie_pos.y))
 	_apply_saved_gear(charlie, saved_gear)
 	_archive_unit(charlie)
@@ -137,7 +140,10 @@ func _spawn_enemy_from_config(ec: Dictionary) -> void:
 			e.advance_triggered = false
 	for g: Dictionary in ec.get("gear", []):
 		match g.get("slot", ""):
-			"weapon":  e.gear.append(GearItem.make_weapon(g["id"], g.get("mod", 1), g.get("rng", 2)))
+			"weapon":
+				e.gear.append(GearItem.make_weapon(g["id"], g.get("mod", 1), g.get("rng", 2)))
+				if e.archetype == Unit.Archetype.GUARDIAN:
+					e.gear.back().special = WeaponSpecial.make(WeaponSpecial.SpecialType.SUPPRESSING_FIRE)
 			"armor":   e.gear.append(GearItem.make_armor(g["id"], g.get("mod", 1)))
 			"medical": e.gear.append(GearItem.make_medical_kit(g["id"]))
 	var pos: Vector2i = ec.get("pos", Vector2i(5, 10))
@@ -162,6 +168,7 @@ func _spawn_vanguard() -> void:
 		if i == 2 and rival_rank >= 3:
 			v.gear.append(GearItem.make_medical_kit("VANGUARD-MEDKIT"))
 		v.gear.append(GearItem.make_weapon("SALVAGE-PISTOL", 1, 2))
+		v.gear.back().special = WeaponSpecial.make(WeaponSpecial.SpecialType.SUPPRESSING_FIRE)
 		_place(v, GridPos.new(vpos.x, vpos.y))
 
 func _make_unit(id: String, player: bool, leader: bool,
@@ -511,6 +518,7 @@ func _on_end_turn() -> void:
 
 func _run_enemy_phase() -> void:
 	game_phase = GamePhase.ENEMY_TURN
+	AudioManager.crossfade_to_tension()
 	hud.set_phase(false)
 	hud.set_skip_visible(true)
 	_skip_requested = false
@@ -634,6 +642,7 @@ func _run_enemy_phase() -> void:
 		hud.log("[WARNING] HAZARD ZONE ACTIVE — CLEAR THE AREA")
 
 	game_phase = GamePhase.PLAYER_TURN
+	AudioManager.crossfade_to_calm()
 	hud.set_phase(true)
 	hud.set_round(round_number)
 	hud.log("--- ROUND %d — PLAYER TURN ---" % round_number)
@@ -694,6 +703,7 @@ func _check_game_over() -> void:
 
 func _on_mission_success() -> void:
 	game_phase = GamePhase.GAME_OVER
+	AudioManager.play_sfx("mission_complete")
 	for u in _get_player_units():
 		_archive_unit(u)
 	var gs: Node = get_node("/root/GameState")
@@ -734,6 +744,7 @@ func _on_mission_success() -> void:
 
 func _on_mission_fail(reason: String) -> void:
 	game_phase = GamePhase.GAME_OVER
+	AudioManager.play_sfx("mission_fail")
 	for u in _get_player_units():
 		_archive_unit(u)
 	var gs: Node = get_node("/root/GameState")

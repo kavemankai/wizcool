@@ -86,7 +86,8 @@ var archetype: int             # enemies only
 
 - **Phase 1–10:** ✅ Complete — grid shell → combat → AI → gear economy → hazards → rival → mission loop → terminal hub → prototype mission → polish
 - **Audit:** ✅ Complete — CombatResolver, GameState/SaveManager autoloads, signal architecture
-- **Phase 11 (current):** Combat feel — CombatCutaway overlay, slow enemy phase, skip button, enemy inspection, ranged bullet animation, fade in/out, result slam, gear badge, fast-mode toggle
+- **Phase 11:** ✅ Complete — CombatCutaway overlay, slow enemy phase, skip button, enemy inspection, ranged bullet animation, fade in/out, result slam, gear badge, fast-mode toggle
+- **Phase 12 (current):** Combat depth — cover system integration, precision strikes, AoE resolver, weapon specials (suppressing fire, corrosive burst, arc pulse, sealant pack), status effects (SUPPRESSED / CORRODED / OVERLOADED), audio foundation (SFX/music buses + first sounds)
 
 ## Enemy Archetypes
 

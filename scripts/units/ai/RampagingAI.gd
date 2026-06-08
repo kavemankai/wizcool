@@ -41,7 +41,7 @@ static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager,
 
 	# Attack if in range
 	if not unit.has_attacked and EnemyAI.can_attack(unit, target, grid):
-		var result := EnemyAI.do_attack(unit, target, cutaway_queue)
+		var result := EnemyAI.do_attack(unit, target, grid, cutaway_queue)
 		if result >= 0:
 			var suffix := ""
 			if result == Unit.DamageResult.GEAR_FRACTURED:

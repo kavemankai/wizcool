@@ -58,7 +58,9 @@ func _ready() -> void:
 	_end_turn_btn.set_size(Vector2(164, 38))
 	_end_turn_btn.text = "END TURN"
 	_end_turn_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_end_turn_btn.pressed.connect(func() -> void: end_turn_pressed.emit())
+	_end_turn_btn.pressed.connect(func() -> void:
+		AudioManager.play_sfx("ui_click")
+		end_turn_pressed.emit())
 	root.add_child(_end_turn_btn)
 
 	_field_patch_btn = Button.new()
@@ -67,7 +69,9 @@ func _ready() -> void:
 	_field_patch_btn.text = "FIELD PATCH"
 	_field_patch_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_field_patch_btn.visible = false
-	_field_patch_btn.pressed.connect(func() -> void: field_patch_pressed.emit())
+	_field_patch_btn.pressed.connect(func() -> void:
+		AudioManager.play_sfx("ui_click")
+		field_patch_pressed.emit())
 	root.add_child(_field_patch_btn)
 
 	_skip_btn = Button.new()
@@ -76,7 +80,9 @@ func _ready() -> void:
 	_skip_btn.text = "SKIP ENEMY PHASE"
 	_skip_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_skip_btn.visible = false
-	_skip_btn.pressed.connect(func() -> void: skip_pressed.emit())
+	_skip_btn.pressed.connect(func() -> void:
+		AudioManager.play_sfx("ui_click")
+		skip_pressed.emit())
 	root.add_child(_skip_btn)
 
 	_cutaway_btn = Button.new()

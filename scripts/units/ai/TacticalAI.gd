@@ -29,7 +29,7 @@ static func take_turn(unit: Unit, all_units: Array[Unit],
 		# Hold — still fire if a player walks into range
 		var in_range := _nearest_player_in_range(unit, all_units, grid)
 		if in_range != null:
-			var result := EnemyAI.do_attack(unit, in_range, cutaway_queue)
+			var result := EnemyAI.do_attack(unit, in_range, grid, cutaway_queue)
 			if result >= 0:
 				log.append("[VANGUARD] %s FIRES  %s  [%d/%d]%s" % [
 					unit.unit_id, in_range.unit_id,
@@ -66,7 +66,7 @@ static func take_turn(unit: Unit, all_units: Array[Unit],
 	if not unit.has_attacked and not abilities_blocked:
 		var leader_ps := _find_leader(all_units)
 		if leader_ps != null and PrecisionStrike.can_use(unit, leader_ps):
-			var result := EnemyAI.do_attack(unit, leader_ps, cutaway_queue)
+			var result := EnemyAI.do_attack(unit, leader_ps, grid, cutaway_queue)
 			if result >= 0:
 				CombatResolver.apply_status(leader_ps, StatusEffect.Type.SUPPRESSED)
 				log.append("[VANGUARD] %s PRECISION → %s  [%d/%d] [SUPPRESSED]" % [
@@ -96,7 +96,7 @@ static func take_turn(unit: Unit, all_units: Array[Unit],
 			attack_target = _nearest_player_in_range(unit, all_units, grid)
 
 		if attack_target != null:
-			var result := EnemyAI.do_attack(unit, attack_target, cutaway_queue)
+			var result := EnemyAI.do_attack(unit, attack_target, grid, cutaway_queue)
 			if result >= 0:
 				log.append("[VANGUARD] %s → %s  [%d/%d]%s" % [
 					unit.unit_id, attack_target.unit_id,

@@ -31,7 +31,7 @@ static func _pursue_and_attack(
 				log.append("%s MOVES → [%d,%d]" % [unit.unit_id, dest.x, dest.y])
 
 	if EnemyAI.can_attack(unit, target, grid):
-		var result := EnemyAI.do_attack(unit, target, cutaway_queue)
+		var result := EnemyAI.do_attack(unit, target, grid, cutaway_queue)
 		if result >= 0:
 			log.append("%s ATTACKS %s  [%d/%d]%s" % [
 				unit.unit_id, target.unit_id,

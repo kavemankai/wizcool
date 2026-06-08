@@ -8,12 +8,12 @@ static func move_to(unit: Unit, pos: GridPos, grid: GridManager) -> void:
 	unit.place_at(pos, grid)
 	unit.has_moved = true
 
-static func do_attack(attacker: Unit, target: Unit, cutaway_queue: Object = null) -> int:
+static func do_attack(attacker: Unit, target: Unit, grid: GridManager = null, cutaway_queue: Object = null) -> int:
 	if attacker.has_attacked or target.is_downed:
 		return -1
 	var dmg := attacker.get_weapon_damage()
 	var pre_tgh := target.toughness
-	var result := CombatResolver.resolve_damage(target, dmg)
+	var result := CombatResolver.resolve_damage_ex(attacker, target, dmg, false, grid)
 	attacker.has_attacked = true
 	if cutaway_queue != null:
 		cutaway_queue.queue_event(attacker, target, dmg, result, pre_tgh)
