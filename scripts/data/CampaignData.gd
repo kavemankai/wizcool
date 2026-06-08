@@ -79,8 +79,10 @@ static func _cb_1() -> Dictionary:
 		],
 		# Vanguard are held back and cut in from the tip (top) of the site on
 		# round 3 — they guard the evidence locker rather than backstabbing the
-		# crew at the start line.
+		# crew at the start line. First mission fields a single Vanguard so the
+		# leader isn't overwhelmed.
 		"vanguard_spawn_turn": 3,
+		"vanguard_count": 1,
 		"vanguard_spawns": [
 			{"pos": Vector2i(3, 1), "zone_min": 1, "zone_max": 6},
 			{"pos": Vector2i(8, 1), "zone_min": 1, "zone_max": 6},
