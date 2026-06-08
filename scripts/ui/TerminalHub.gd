@@ -60,7 +60,17 @@ func _ready() -> void:
 
 	_row(vbox, "")
 	_row(vbox, "── CONTRACT SELECT ──")
-	_row(vbox, "  [ACTIVE]  CONTAINMENT BREACH  —  Industrial Detention Facility Block 7")
+	var campaign_id: String = _gs.current_campaign_id
+	var camp := CampaignData.get_campaign(campaign_id)
+	var mission_count := CampaignData.get_mission_count(campaign_id)
+	var mission_idx: int = _gs.current_mission_index
+	var cur_mission := CampaignData.get_mission(campaign_id, mission_idx)
+	if mission_idx == 0:
+		_row(vbox, "  [ACTIVE]  %s  —  %s" % [camp.get("title", ""), camp.get("description", "")])
+		_row(vbox, "  MISSION 1/%d  —  %s" % [mission_count, cur_mission.get("title", "")])
+	else:
+		_row(vbox, "  [IN PROGRESS]  %s  —  MISSION %d/%d" % [camp.get("title", ""), mission_idx + 1, mission_count])
+		_row(vbox, "  NEXT: %s" % cur_mission.get("title", ""))
 	_row(vbox, "")
 
 	var depart_btn := Button.new()

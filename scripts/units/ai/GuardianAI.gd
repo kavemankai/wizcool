@@ -36,6 +36,12 @@ static func _pursue_and_attack(
 			log.append("%s ATTACKS %s  [%d/%d]%s" % [
 				unit.unit_id, target.unit_id,
 				target.toughness, target.max_toughness, _attack_suffix(result)])
+			# Apply Suppressed via Suppressing Fire special if ready
+			var sup_special := EnemyAI.get_special_for_slot(unit, "weapon")
+			if sup_special != null and sup_special.type == WeaponSpecial.SpecialType.SUPPRESSING_FIRE and sup_special.is_ready():
+				CombatResolver.apply_status(target, StatusEffect.Type.SUPPRESSED)
+				sup_special.activate()
+				log.append("[GUARDIAN] %s SUPPRESSES %s" % [unit.unit_id, target.unit_id])
 	else:
 		log.append("%s SIGHTS %s — OUT OF RANGE" % [unit.unit_id, target.unit_id])
 

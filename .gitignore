@@ -9,3 +9,7 @@ export_presets.cfg
 
 # Windows thumbnail cache
 Thumbs.db
+
+# Claude Code session state
+production/session-state/active.md
+production/session-logs/

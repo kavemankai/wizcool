@@ -59,6 +59,15 @@ var is_downed: bool = false
 var is_selected: bool = false
 var is_acting: bool = false
 
+# Combat depth fields
+var facing: Vector2i = Vector2i(0, 1)              # default facing south
+var cover_integrity: int = 0                        # remaining hits before cover breaks
+var cover_type: CoverSystem.CoverType = CoverSystem.CoverType.NONE
+var status_effects: StatusEffectManager
+
+func _ready() -> void:
+	status_effects = StatusEffectManager.new()
+
 func get_effective_combat_skill() -> int:
 	var total := combat_skill
 	for item: GearItem in gear:
@@ -81,6 +90,33 @@ func get_weapon_damage() -> int:
 
 func can_act() -> bool:
 	return not is_downed and not (has_moved and has_attacked)
+
+## Called at the start of each unit's turn: ticks status effects and weapon cooldowns.
+func tick_turn_start() -> void:
+	status_effects.tick_all()
+	for item: GearItem in gear:
+		if item.special != null:
+			item.special.tick_cooldown()
+
+## Apply a status effect, refreshing duration if the type is already active.
+func apply_status(effect: StatusEffect) -> void:
+	status_effects.apply(effect)
+
+## Returns true if this unit currently has the given status effect type.
+func has_status(type: StatusEffect.Type) -> bool:
+	return status_effects.has(type)
+
+## Effective movement range after applying any active status penalties.
+func get_effective_move() -> int:
+	return maxi(1, get_effective_speed() - status_effects.get_move_penalty())
+
+## Returns the gear state (int) of the equipped weapon, or INTACT if no weapon.
+## Used by CoverSystem to determine whether cover effectiveness is penalised.
+func get_weapon_gear_state() -> int:
+	for item: GearItem in gear:
+		if item.slot == "weapon":
+			return item.state
+	return GearItem.GearState.INTACT
 
 func has_fractured_gear() -> bool:
 	for item: GearItem in gear:

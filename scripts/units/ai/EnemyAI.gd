@@ -73,3 +73,48 @@ static func occupied_positions(all_units: Array[Unit], exclude: Unit) -> Array[G
 		if u != exclude and not u.is_downed:
 			result.append(u.grid_pos)
 	return result
+
+## Returns net AoE score for a given origin cell:
+## +1 per enemy of source in blast radius, -2 per friendly in blast radius.
+static func score_aoe_cell(origin: GridPos, source: Unit, all_units: Array[Unit]) -> int:
+	var score: int = 0
+	for u in all_units:
+		if u.is_downed:
+			continue
+		var dist := chebyshev(origin, u.grid_pos)
+		if dist > CombatConstants.BLAST_RADIUS_DEFAULT:
+			continue
+		if u.is_player != source.is_player:
+			score += 1  # enemy of source
+		else:
+			score -= 2  # friendly (heavily penalised)
+	return score
+
+## Returns the enemy unit whose position (as AoE origin) scores highest.
+## Only considers cells within source.attack_range.
+static func find_best_aoe_target(source: Unit, all_units: Array[Unit], grid: GridManager) -> Unit:
+	var best_unit: Unit = null
+	var best_score: int = CombatConstants.AI_AOE_MIN_SCORE - 1
+	for u in all_units:
+		if u.is_downed or u.is_player == source.is_player:
+			continue
+		if not can_attack(source, u, grid):
+			continue
+		var score := score_aoe_cell(u.grid_pos, source, all_units)
+		if score > best_score:
+			best_score = score
+			best_unit = u
+	return best_unit
+
+## Returns true if the unit has the given StatusEffect type active.
+static func unit_has_status(unit: Unit, type: StatusEffect.Type) -> bool:
+	if unit.status_effects == null:
+		return false
+	return unit.status_effects.has(type)
+
+## Returns the WeaponSpecial for the given gear slot, or null if none equipped.
+static func get_special_for_slot(unit: Unit, slot: String) -> WeaponSpecial:
+	for item: GearItem in unit.gear:
+		if item.slot == slot and item.special != null:
+			return item.special
+	return null

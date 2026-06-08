@@ -1,11 +1,13 @@
 # FRINGE LEDGER — Claude Code Reference
 
+> **First session in a new context?** Run `/start` to orient, or `/sprint-status` to see current work.
+
 ## What this is
 
 Tactical gear-focused sRPG. Industrial hard sci-fi / cassette-futurism aesthetic. Locked orthographic grid. Characters never level up — only gear progresses. Gear has physical state: Intact → Fractured → Broken.
 
-**Genre:** Tactical sRPG  
-**Engine:** Godot 4.x, GDScript  
+**Genre:** Tactical sRPG
+**Engine:** Godot 4.6, GDScript
 **Viewport:** 1280×720, locked orthographic
 
 ## Core Loop
@@ -14,138 +16,155 @@ Tactical gear-focused sRPG. Industrial hard sci-fi / cassette-futurism aesthetic
 [SALVAGE MANIFEST] → [TACTICAL SKIRMISH] → [FRACTURED GEAR RESOLUTION] → [TERMINAL HUB]
 ```
 
+## Configuration References
+
+@.claude/docs/directory-structure.md
+@.claude/docs/technical-preferences.md
+@.claude/docs/coordination-rules.md
+@.claude/docs/coding-standards.md
+@.claude/docs/context-management.md
+
+## Engine Version
+
+@docs/engine-reference/godot/VERSION.md
+
 ## Project Structure
 
 ```
 res://
   scenes/
-    Main.tscn               # Skirmish scene: GridManager, UnitLayer, Camera2D, HUD
+    Main.tscn               # Skirmish scene root
     ui/
-      ManifestScreen.tscn   # Pre-mission crew/gear selection
+      ManifestScreen.tscn
       PostMissionScreen.tscn
-      TerminalHub.tscn      # Repair, fence, contract select
+      TerminalHub.tscn
   scripts/
-    Main.gd                 # Root controller — input, turn loop, AI dispatch
+    Main.gd                 # Input routing, turn loop, AI dispatch
     core/
-      GridPos.gd            # class_name GridPos
-      GridManager.gd        # class_name GridManager
-      LOSCalculator.gd      # class_name LOSCalculator (static has_los)
-      MovementRange.gd      # class_name MovementRange
-      TurnManager.gd        # stub — signals: turn_started, round_started
+      GridPos.gd | GridManager.gd | LOSCalculator.gd | MovementRange.gd
     units/
-      GearItem.gd           # class_name GearItem — GearState enum {INTACT,FRACTURED,BROKEN}
-      Unit.gd               # class_name Unit — signals: toughness_changed, unit_downed
-      ai/
-        EnemyAI.gd          # class_name EnemyAI — shared helpers only, no dispatch
-        GuardianAI.gd       # class_name GuardianAI
-        RampagingAI.gd      # class_name RampagingAI
-        TacticalAI.gd       # class_name TacticalAI
+      Unit.gd | GearItem.gd
+      ai/  EnemyAI.gd | GuardianAI.gd | RampagingAI.gd | TacticalAI.gd
     systems/
-      CombatResolver.gd     # class_name CombatResolver — static resolve_damage()
-      GearSystem.gd         # stub — signal: gear_state_changed
-      HazardSystem.gd       # class_name HazardSystem — pressure dump zones
-      MissionSystem.gd      # stub — signal: mission_complete
-      RivalSystem.gd        # stub
+      CombatResolver.gd | HazardSystem.gd
+      (stubs) GearSystem.gd | HazardSystem.gd | MissionSystem.gd | RivalSystem.gd
     ui/
-      HUD.gd                # class_name HUD
-      ManifestScreen.gd     # pre-mission screen
-      PostMissionScreen.gd  # result screen — reads GameState
-      TerminalHub.gd        # hub screen — reads/writes GameState, calls SaveManager.save()
+      HUD.gd | CombatCutaway.gd | CutawayUnit.gd
+      ManifestScreen.gd | PostMissionScreen.gd | TerminalHub.gd
     data/
-      GameState.gd          # AUTOLOAD — state holder, no logic
-      SaveManager.gd        # AUTOLOAD — reads/writes GameState to disk (JSON)
-  assets/
-    audio/
-    sprites/
+      GameState.gd (AUTOLOAD) | SaveManager.gd (AUTOLOAD)
 ```
 
 ## Autoloads
 
 Exactly two autoloads:
-- `GameState` — holds `credits`, `vanguard_rank`, `crew`, `gear_inventory`, `broken_inventory`, `fractured_inventory`, `last_mission_result`, `pending_loot`, `DEBUG_MODE`
-- `SaveManager` — `save()` and `load_save()` only; converts GearState ints ↔ JSON strings
+- `GameState` — credits, vanguard_rank, crew, gear/broken/fractured inventory, last_mission_result, pending_loot, show_cutaway
+- `SaveManager` — `save()` and `load_save()` only; JSON serialisation
 
 ## Grid Spec
 
-- 12 wide × 20 tall tiles
-- Tile size: 32×32 px
-- Three tile types: `FLOOR`, `WALL`, `COVER`
-- Grid centered in viewport at runtime
-- Camera2D locked — no pan, no zoom
+- 12 wide × 20 tall tiles, 32×32 px, centred in viewport at runtime
+- Three tile types: FLOOR, WALL, COVER
+- Camera2D locked — no pan/zoom
 
 ## Key Data Structures
 
 ```gdscript
-class_name GridPos          # GridPos.gd
-var x: int
-var y: int
+enum Archetype { NONE, GUARDIAN, RAMPAGING, TACTICAL }
+enum DamageResult { NORMAL, GEAR_FRACTURED, GEAR_BROKEN, DOWNED }
+enum GearState { INTACT, FRACTURED, BROKEN }    # in GearItem
 
-enum TileType { FLOOR, WALL, COVER }    # defined in GridManager
-
-class_name Unit             # Unit.gd — Phase 1 placeholder
 var unit_id: String
-var is_player: bool
-var is_leader: bool
-var grid_pos: GridPos
-var is_selected: bool
+var is_player: bool | is_leader: bool
+var grid_pos: GridPos          # GridPos.x / GridPos.y (int)
+var toughness / max_toughness: int
+var gear: Array[GearItem]
+var archetype: int             # enemies only
 ```
-
-## Key Rules
-
-- `GridManager` owns all tile state and grid↔world coordinate conversion
-- `Main.gd` owns input routing and scene-level state — nothing else handles input
-- Units are children of `UnitLayer` (sibling of `GridManager`)
-- No game logic in UI scripts
-- Every phase must produce a runnable build before the next phase starts
 
 ## Phase Build Order
 
-- **Phase 1:** ✅ Grid shell — tiles, camera, unit placement, click-to-select
-- **Phase 2:** ✅ Combat core — turn order, movement, attack, Toughness, LOS
-- **Phase 3:** ✅ Enemy AI — Guardian / Rampaging / Tactical archetypes
-- **Phase 4:** ✅ Fractured gear economy — three-state model, field-patch, Medical slot
-- **Phase 5:** ✅ Environmental hazards — warning system, pressure dump activation
-- **Phase 6:** ✅ The Rival — Vanguard faction, Rival Rank persistence
-- **Phase 7:** ✅ Mission loop — ManifestScreen, extraction tile (5,2), failure states, PostMissionScreen
-- **Phase 8:** ✅ Terminal Hub — repair, fence, contract select, credit economy; SaveManager JSON persistence
-- **Phase 9:** ✅ "Containment Breach" — full hand-authored prototype mission; Zone A/B/C; DANGER_PAY=150
-- **Phase 10:** ✅ Polish & feel — pulsing extraction tile, mission label in HUD, round counter, full loop
-- **Audit:** ✅ Code audit — script reorganization, signal-driven architecture, CombatResolver, GameState/SaveManager autoloads, enum-only gear state, starting fractured gear mechanic
-
-## Zone Layout (Containment Breach prototype)
-
-```
-Zone C (rows 14–19): Evidence locker — leader-only interaction
-Zone B (rows  8–13): Security Bot patrol, narrow corridors, hazard tiles
-Zone A (rows  1– 7): Player entry, Feral Prisoners, Vanguard south entry
-```
+- **Phase 1–10:** ✅ Complete — grid shell → combat → AI → gear economy → hazards → rival → mission loop → terminal hub → prototype mission → polish
+- **Audit:** ✅ Complete — CombatResolver, GameState/SaveManager autoloads, signal architecture
+- **Phase 11 (current):** Combat feel — CombatCutaway overlay, slow enemy phase, skip button, enemy inspection, ranged bullet animation, fade in/out, result slam, gear badge, fast-mode toggle
 
 ## Enemy Archetypes
 
-| Archetype | Behaviour | Prototype Unit |
-|---|---|---|
-| Guardian | Patrol route, engage on LOS, stay in zone | Security Bots |
-| Rampaging | Charge nearest unit regardless of faction | Feral Prisoners |
-| Tactical | Hold, wait for player weakness, advance, hunt leader | Vanguard Crew |
+| Archetype | Behaviour |
+|---|---|
+| Guardian | Patrol route, engage on LOS, stay in zone |
+| Rampaging | Charge nearest unit regardless of faction |
+| Tactical | Hold, wait for weakness, advance, hunt leader |
 
-## Gear State Model (Phase 4+)
+## Gear State Model
 
 | State | Modifier | Recovery |
 |---|---|---|
 | Intact | Full | N/A |
-| Fractured | Nullified | Field-patch (1 Combat Action, once per item per mission, restores 50%) |
-| Broken | Absent, slot empty | Full repair at Terminal Hub (credit cost) |
+| Fractured | Nullified (50% if field-patched) | Field-patch (once per item per mission) |
+| Broken | Absent | Full repair at Terminal Hub (credits) |
 
-## Failure States (Phase 7+)
+## Failure States
 
-- Leader Broken (0 Toughness twice with Fractured gear) → mission fail
-- Round limit expires (20 rounds prototype) → mission fail
-- Consequences: all crew gear Fractured, no Danger Pay, Vanguard Rank +1
+- Leader downed (0 TGH with Fractured gear) → mission fail
+- Round limit 20 → mission fail
+- All crew down → mission fail
+- Penalty: all Intact gear → Fractured, no Danger Pay, Vanguard Rank +1
 
 ## Risk Flags
 
-**Grid centering** — computed in `Main.gd _ready()` using `get_viewport_rect().size`, not hardcoded.
+- **Grid centering** — `get_viewport_rect().size` in `Main.gd _ready()`, not hardcoded
+- **class_name forward refs** — GridPos/GridManager must parse before dependents
+- **Async turn loop** — `_do_attack()` and `_run_enemy_phase()` use `await`; callers must `await` them
+- **CombatResolver** — ALL damage routes through `CombatResolver.resolve_damage()` — never call `unit.take_damage()` directly
 
-**class_name forward references** — `GridPos` and `GridManager` must be parsed before scripts that reference them. Godot handles this via class_name registration; avoid circular dependencies.
+## GodotPrompter Skills (project-scoped v1.9.0)
 
-**Phase creep** — do not add Phase N+1 features until Phase N acceptance criteria pass.
+| When working on… | Skill |
+|---|---|
+| Tweens, easing, motion sequences | `/tween-animation` |
+| GDScript typing, coroutines, await | `/gdscript-patterns` |
+| Turn state machine, phase transitions | `/state-machine` |
+| SaveManager, GameState, JSON | `/save-load` |
+| HUD layout, Control nodes, buttons | `/godot-ui` or `/hud-system` |
+| Enemy AI, pathfinding | `/ai-navigation` |
+| Adding audio (not yet implemented) | `/audio-system` |
+| 2D rendering, CanvasLayer, draw calls | `/2d-essentials` |
+| Scene tree / node composition | `/scene-organization` |
+| Signal architecture | `/event-bus` |
+| Performance profiling | `/godot-optimization` |
+| Debugging signals / remote debugger | `/godot-debugging` |
+
+## Studio Workflow Skills
+
+| Task | Skill |
+|---|---|
+| Start or resume a session | `/start` |
+| Plan the current sprint | `/sprint-plan` |
+| Check sprint progress | `/sprint-status` |
+| Implement a story | `/dev-story` |
+| Mark a story complete | `/story-done` |
+| Review code | `/code-review` |
+| File a bug | `/bug-report` |
+| Triage bugs | `/bug-triage` |
+| Check phase gate readiness | `/gate-check` |
+| Design a new system | `/design-system` |
+| Technical debt review | `/tech-debt` |
+| Security audit | `/security-audit` |
+
+## Agents
+
+Spawn via the Agent tool. Key agents for this project:
+
+| Agent | Use for |
+|---|---|
+| `godot-gdscript-specialist` | All `.gd` implementation work |
+| `godot-specialist` | Scene files, project config, Godot-specific issues |
+| `lead-programmer` | Cross-system decisions, code review, story routing |
+| `technical-director` | Architecture decisions, ADRs, system design |
+| `gameplay-programmer` | Combat system, AI, gear economy logic |
+| `systems-designer` | Balance, game feel, mechanic design |
+| `ui-programmer` | HUD, CombatCutaway, Control tree |
+| `producer` | Sprint planning, milestone tracking |
+| `qa-lead` | Test planning, bug triage |
+| `performance-analyst` | Profiling, optimisation |

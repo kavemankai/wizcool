@@ -25,6 +25,9 @@ func save() -> void:
 	var data: Dictionary = {
 		"credits": gs.credits,
 		"vanguard_rank": gs.vanguard_rank,
+		"current_campaign_id": gs.current_campaign_id,
+		"current_mission_index": gs.current_mission_index,
+		"campaigns_completed": gs.campaigns_completed,
 		"crew": crew_data,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -50,6 +53,9 @@ func load_save() -> void:
 	var result: Dictionary = parsed
 	gs.credits = result.get("credits", STARTING_CREDITS)
 	gs.vanguard_rank = result.get("vanguard_rank", 1)
+	gs.current_campaign_id = result.get("current_campaign_id", "containment-breach")
+	gs.current_mission_index = result.get("current_mission_index", 0)
+	gs.campaigns_completed = result.get("campaigns_completed", 0)
 	var raw_crew: Array = result.get("crew", [])
 	for entry: Dictionary in raw_crew:
 		var gear_data: Array = []

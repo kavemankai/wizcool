@@ -22,6 +22,7 @@ var _pre_tgh: int = 0
 var _event_pending: bool = false
 var _playing: bool = false
 var _anim_tween: Tween = null
+var _fade_tween: Tween = null
 
 # Text UI refs
 var _atk_label: Label = null
@@ -34,6 +35,14 @@ var _result_label: Label = null
 # Sprite refs
 var _atk_sprite: CutawayUnit = null
 var _def_sprite: CutawayUnit = null
+var _bullet: ColorRect = null
+
+# Root control (faded for in/out transitions)
+var _root: Control = null
+
+# Gear consequence badge
+var _gear_badge: ColorRect = null
+var _gear_badge_label: Label = null
 
 func _ready() -> void:
 	layer = 10
@@ -62,9 +71,17 @@ func play_pending() -> void:
 	if not _event_pending:
 		return
 	_playing = true
+	_root.modulate.a = 0.0
 	visible = true
 	_populate_panels()
 	_setup_sprites()
+	if is_instance_valid(_fade_tween):
+		_fade_tween.kill()
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(_root, "modulate:a", 1.0, 0.15)
+	await _fade_tween.finished
+	if not _playing:
+		return
 	_play_attack_animation()
 	await get_tree().create_timer(0.85).timeout
 	if not _playing:
@@ -90,8 +107,14 @@ func _finish() -> void:
 	_playing = false
 	if is_instance_valid(_anim_tween):
 		_anim_tween.kill()
+	if is_instance_valid(_fade_tween):
+		_fade_tween.kill()
 	_reset_sprite_positions()
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(_root, "modulate:a", 0.0, 0.20)
+	await _fade_tween.finished
 	visible = false
+	_root.modulate.a = 1.0
 	_event_pending = false
 	cutaway_dismissed.emit()
 
@@ -142,6 +165,12 @@ func _populate_panels() -> void:
 		Unit.DamageResult.DOWNED:
 			_result_label.text = "TARGET DOWNED"
 
+	# Hide result label — revealed with slam animation in _update_tgh_label
+	_result_label.modulate.a = 0.0
+	_result_label.scale = Vector2(1.35, 1.35)
+	_gear_badge.visible = false
+	_gear_badge_label.visible = false
+
 func _update_tgh_label() -> void:
 	if not is_instance_valid(_target):
 		return
@@ -154,6 +183,27 @@ func _update_tgh_label() -> void:
 		_:
 			_def_tgh_label.text = "TOUGHNESS  %d / %d" % [
 				_target.toughness, _target.max_toughness]
+
+	# Gear consequence badge
+	if _result == Unit.DamageResult.GEAR_FRACTURED or _result == Unit.DamageResult.GEAR_BROKEN:
+		var is_fractured := _result == Unit.DamageResult.GEAR_FRACTURED
+		_gear_badge.color = Color(0.60, 0.28, 0.04) if is_fractured else Color(0.22, 0.05, 0.05)
+		_gear_badge_label.text = "  GEAR FRACTURED" if is_fractured else "  GEAR BROKEN — DOWNED"
+		var fc := Color(1.0, 0.75, 0.35) if is_fractured else Color(1.0, 0.38, 0.28)
+		_gear_badge_label.add_theme_color_override("font_color", fc)
+		_gear_badge.modulate.a = 0.0
+		_gear_badge_label.modulate.a = 0.0
+		_gear_badge.visible = true
+		_gear_badge_label.visible = true
+		var bt := create_tween().set_parallel(true)
+		bt.tween_property(_gear_badge, "modulate:a", 1.0, 0.18)
+		bt.tween_property(_gear_badge_label, "modulate:a", 1.0, 0.18)
+
+	# Result label slam in
+	var rt := create_tween().set_parallel(true)
+	rt.tween_property(_result_label, "scale", Vector2.ONE, 0.18) \
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	rt.tween_property(_result_label, "modulate:a", 1.0, 0.14)
 
 # ---------------------------------------------------------------------------
 # Sprite setup & animation
@@ -173,6 +223,8 @@ func _reset_sprite_positions() -> void:
 	if is_instance_valid(_def_sprite):
 		_def_sprite.position = _DEF_HOME
 		_def_sprite.flash_alpha = 0.0
+	if is_instance_valid(_bullet):
+		_bullet.visible = false
 
 func _play_attack_animation() -> void:
 	if not is_instance_valid(_attacker) or not is_instance_valid(_target):
@@ -183,40 +235,59 @@ func _play_attack_animation() -> void:
 	_anim_tween = create_tween()
 	_anim_tween.set_parallel(true)
 
-	# Attacker lunges toward defender, then retreats
-	_anim_tween.tween_property(_atk_sprite, "position:x",
-		_ATK_HOME.x + 105.0, 0.22).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-	_anim_tween.tween_property(_atk_sprite, "position:x",
-		_ATK_HOME.x, 0.22).set_delay(0.22).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-
-	# Attacker flash on impact
-	_anim_tween.tween_property(_atk_sprite, "flash_alpha",
-		0.35, 0.06).set_delay(0.19)
-	_anim_tween.tween_property(_atk_sprite, "flash_alpha",
-		0.0, 0.18).set_delay(0.25)
-
-	# Defender flash on impact
-	_anim_tween.tween_property(_def_sprite, "flash_alpha",
-		0.75, 0.06).set_delay(0.19)
-	_anim_tween.tween_property(_def_sprite, "flash_alpha",
-		0.0, 0.30).set_delay(0.25)
-
-	# Defender recoil shake (3 oscillations)
-	_anim_tween.tween_property(_def_sprite, "position:x",
-		_DEF_HOME.x + 22.0, 0.06).set_delay(0.19)
-	_anim_tween.tween_property(_def_sprite, "position:x",
-		_DEF_HOME.x - 14.0, 0.09).set_delay(0.25)
-	_anim_tween.tween_property(_def_sprite, "position:x",
-		_DEF_HOME.x + 8.0,  0.09).set_delay(0.34)
-	_anim_tween.tween_property(_def_sprite, "position:x",
-		_DEF_HOME.x, 0.12).set_delay(0.43)
-
-	# Health bar drain starts at impact, runs through animation
 	var post_w := 0.0
 	if _result == Unit.DamageResult.NORMAL and is_instance_valid(_target):
 		post_w = _BAR_W * (float(_target.toughness) / float(_target.max_toughness))
-	_anim_tween.tween_property(_def_bar_fill, "size:x",
-		post_w, 0.55).set_delay(0.19).set_ease(Tween.EASE_OUT)
+
+	if _is_ranged_attack():
+		# --- RANGED: bullet projectile ---
+		_bullet.position = Vector2(_ATK_HOME.x + 65.0, _ATK_HOME.y - 3.0)
+		_bullet.visible = true
+
+		# Attacker muzzle flash
+		_anim_tween.tween_property(_atk_sprite, "flash_alpha", 0.40, 0.07)
+		_anim_tween.tween_property(_atk_sprite, "flash_alpha", 0.0, 0.14).set_delay(0.07)
+
+		# Bullet travels to defender (x only — they share the same y)
+		_anim_tween.tween_property(_bullet, "position:x",
+			_DEF_HOME.x - 65.0, 0.25).set_delay(0.05) \
+			.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		_anim_tween.tween_callback(func() -> void: _bullet.visible = false).set_delay(0.30)
+
+		# Impact at t=0.30
+		_anim_tween.tween_property(_def_sprite, "flash_alpha", 0.75, 0.06).set_delay(0.30)
+		_anim_tween.tween_property(_def_sprite, "flash_alpha", 0.0,  0.30).set_delay(0.36)
+		_anim_tween.tween_property(_def_sprite, "position:x", _DEF_HOME.x + 22.0, 0.06).set_delay(0.30)
+		_anim_tween.tween_property(_def_sprite, "position:x", _DEF_HOME.x - 14.0, 0.09).set_delay(0.36)
+		_anim_tween.tween_property(_def_sprite, "position:x", _DEF_HOME.x + 8.0,  0.09).set_delay(0.45)
+		_anim_tween.tween_property(_def_sprite, "position:x", _DEF_HOME.x, 0.12).set_delay(0.54)
+		_anim_tween.tween_property(_def_bar_fill, "size:x",
+			post_w, 0.45).set_delay(0.30).set_ease(Tween.EASE_OUT)
+	else:
+		# --- MELEE: attacker lunges ---
+		_anim_tween.tween_property(_atk_sprite, "position:x",
+			_ATK_HOME.x + 105.0, 0.22).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		_anim_tween.tween_property(_atk_sprite, "position:x",
+			_ATK_HOME.x, 0.22).set_delay(0.22).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		_anim_tween.tween_property(_atk_sprite, "flash_alpha", 0.35, 0.06).set_delay(0.19)
+		_anim_tween.tween_property(_atk_sprite, "flash_alpha", 0.0,  0.18).set_delay(0.25)
+		_anim_tween.tween_property(_def_sprite, "flash_alpha", 0.75, 0.06).set_delay(0.19)
+		_anim_tween.tween_property(_def_sprite, "flash_alpha", 0.0,  0.30).set_delay(0.25)
+		_anim_tween.tween_property(_def_sprite, "position:x", _DEF_HOME.x + 22.0, 0.06).set_delay(0.19)
+		_anim_tween.tween_property(_def_sprite, "position:x", _DEF_HOME.x - 14.0, 0.09).set_delay(0.25)
+		_anim_tween.tween_property(_def_sprite, "position:x", _DEF_HOME.x + 8.0,  0.09).set_delay(0.34)
+		_anim_tween.tween_property(_def_sprite, "position:x", _DEF_HOME.x, 0.12).set_delay(0.43)
+		_anim_tween.tween_property(_def_bar_fill, "size:x",
+			post_w, 0.55).set_delay(0.19).set_ease(Tween.EASE_OUT)
+
+func _is_ranged_attack() -> bool:
+	if not is_instance_valid(_attacker) or not is_instance_valid(_target):
+		return false
+	if _attacker.grid_pos == null or _target.grid_pos == null:
+		return false
+	var dx: int = abs(_attacker.grid_pos.x - _target.grid_pos.x)
+	var dy: int = abs(_attacker.grid_pos.y - _target.grid_pos.y)
+	return max(dx, dy) > 1
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -236,10 +307,11 @@ func _archetype_str(unit: Unit) -> String:
 # ---------------------------------------------------------------------------
 
 func _build_ui() -> void:
-	var root := Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(root)
+	_root = Control.new()
+	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_root)
+	var root := _root
 
 	# Dark overlay
 	var ovr := ColorRect.new()
@@ -273,7 +345,16 @@ func _build_ui() -> void:
 	_def_bar_fill.color    = _BAR_FILL
 	_def_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_def_bar_fill)
-	_def_stats_label = _make_label(root, Rect2(730, 180, 470, 85), "")
+	_def_stats_label = _make_label(root, Rect2(730, 180, 470, 65), "")
+
+	# Gear consequence badge — shown only when gear fractures or breaks
+	_gear_badge = ColorRect.new()
+	_gear_badge.position = Vector2(730, 250)
+	_gear_badge.size = Vector2(470, 22)
+	_gear_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_gear_badge.visible = false
+	root.add_child(_gear_badge)
+	_gear_badge_label = _make_label(root, Rect2(730, 250, 470, 22), "")
 
 	# === DIVIDER LINE ===
 	var div := ColorRect.new()
@@ -293,11 +374,20 @@ func _build_ui() -> void:
 	_def_sprite.position = _DEF_HOME
 	root.add_child(_def_sprite)
 
+	# Bullet projectile (hidden until a ranged attack fires)
+	_bullet = ColorRect.new()
+	_bullet.size = Vector2(14.0, 6.0)
+	_bullet.color = Color(0.95, 0.90, 0.40)
+	_bullet.visible = false
+	_bullet.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_bullet)
+
 	# === RESULT BAND (bottom) ===
 	_result_label = _make_label(root, Rect2(120, 590, 1040, 40),
 		"", HORIZONTAL_ALIGNMENT_CENTER)
 	_result_label.add_theme_color_override("font_color", Color(0.95, 0.80, 0.20))
 	_result_label.add_theme_font_size_override("font_size", 17)
+	_result_label.pivot_offset = Vector2(520.0, 20.0)
 
 	var footer := _make_label(root, Rect2(120, 642, 1040, 26),
 		"CLICK TO CONTINUE", HORIZONTAL_ALIGNMENT_CENTER)

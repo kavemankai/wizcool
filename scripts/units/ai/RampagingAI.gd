@@ -13,11 +13,19 @@ static func take_turn(unit: Unit, all_units: Array[Unit], grid: GridManager,
 		log.append("%s RAMPAGES — NO TARGET" % unit.unit_id)
 		return log
 
+	# Weapon specials are intentionally ignored — Rampaging AI does not use abilities.
+
 	# Move toward target — no zone restriction, no hazard avoidance
 	if not unit.has_moved:
+		# Apply Suppressed move penalty if afflicted
+		var effective_move: int = unit.get_effective_speed()
+		if EnemyAI.unit_has_status(unit, StatusEffect.Type.SUPPRESSED):
+			effective_move = max(1, effective_move - CombatConstants.SUPPRESSED_MOVE_PENALTY)
+			log.append("%s SUPPRESSED — MOVE REDUCED TO %d" % [unit.unit_id, effective_move])
+
 		var occupied := EnemyAI.occupied_positions(all_units, unit)
 		var reachable := MovementRange.get_reachable(
-			unit.grid_pos, unit.get_effective_speed(), grid, occupied)
+			unit.grid_pos, effective_move, grid, occupied)
 
 		var best := unit.grid_pos
 		var best_dist := EnemyAI.chebyshev(unit.grid_pos, target.grid_pos)

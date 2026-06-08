@@ -10,6 +10,11 @@ static func take_turn(unit: Unit, all_units: Array[Unit],
 		cutaway_queue: Object = null) -> Array[String]:
 	var log: Array[String] = []
 
+	# Tick handled by Main.gd (unit.tick_turn_start()) — no tick call needed here
+
+	# Skip ability use if Overloaded
+	var abilities_blocked: bool = unit.status_effects != null and unit.status_effects.blocks_abilities()
+
 	# Rank 3+: forced advance at round 3 regardless of board state
 	if not unit.advance_triggered and unit.vanguard_rank >= 3 and round_num >= 3:
 		unit.advance_triggered = true
@@ -49,7 +54,38 @@ static func take_turn(unit: Unit, all_units: Array[Unit],
 		var dest := EnemyAI.best_move_toward(unit, target_pos, all_units, grid, false, warning)
 		if not dest.equals(unit.grid_pos):
 			EnemyAI.move_to(unit, dest, grid)
-			log.append("[VANGUARD] %s ADVANCES → [%d,%d]" % [unit.unit_id, dest.x, dest.y])
+			# Check whether the resulting position enables a flanking Precision Strike
+			var flank_leader := _find_leader(all_units)
+			if flank_leader != null and PrecisionStrike.can_use(unit, flank_leader):
+				log.append("[VANGUARD] %s ADVANCES → [%d,%d] [VANGUARD] FLANKING APPROACH" % [
+					unit.unit_id, dest.x, dest.y])
+			else:
+				log.append("[VANGUARD] %s ADVANCES → [%d,%d]" % [unit.unit_id, dest.x, dest.y])
+
+	# 1. Check for Precision Strike opportunity — prefer flanking attack on leader
+	if not unit.has_attacked and not abilities_blocked:
+		var leader_ps := _find_leader(all_units)
+		if leader_ps != null and PrecisionStrike.can_use(unit, leader_ps):
+			var result := EnemyAI.do_attack(unit, leader_ps, cutaway_queue)
+			if result >= 0:
+				CombatResolver.apply_status(leader_ps, StatusEffect.Type.SUPPRESSED)
+				log.append("[VANGUARD] %s PRECISION → %s  [%d/%d] [SUPPRESSED]" % [
+					unit.unit_id, leader_ps.unit_id,
+					leader_ps.toughness, leader_ps.max_toughness])
+
+	# 2. Check for AoE attack if unit has an AoE weapon special ready
+	if not unit.has_attacked and not abilities_blocked:
+		var primary_special := EnemyAI.get_special_for_slot(unit, "weapon")
+		if primary_special != null and primary_special.is_ready():
+			var best_aoe_target := EnemyAI.find_best_aoe_target(unit, all_units, grid)
+			if best_aoe_target != null:
+				var hits := AoEResolver.resolve_aoe(best_aoe_target.grid_pos, all_units, _get_weapon(unit))
+				for h: Dictionary in hits:
+					CombatResolver.resolve_damage(h["unit"], h["damage"])
+				primary_special.activate()
+				unit.has_attacked = true
+				log.append("[VANGUARD] %s AoE → [%d,%d]" % [
+					unit.unit_id, best_aoe_target.grid_pos.x, best_aoe_target.grid_pos.y])
 
 	# Attack — leader first, then any player in range
 	if not unit.has_attacked:
@@ -106,3 +142,9 @@ static func _attack_suffix(result: int) -> String:
 	if result == Unit.DamageResult.GEAR_BROKEN or result == Unit.DamageResult.DOWNED:
 		return " [DOWNED]"
 	return ""
+
+static func _get_weapon(unit: Unit) -> GearItem:
+	for item: GearItem in unit.gear:
+		if item.slot == "weapon":
+			return item
+	return null

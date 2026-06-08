@@ -10,6 +10,7 @@ var modifier: int = 0
 var damage: int = 2                  # weapon hit damage; ignored for non-weapons
 var state: int = GearState.INTACT
 var patched_this_mission: bool = false
+var special: WeaponSpecial = null    # null when the weapon has no special ability
 
 static func make_weapon(id: String, mod: int, dmg: int) -> GearItem:
 	var g := GearItem.new()

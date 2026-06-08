@@ -4,8 +4,12 @@ enum GamePhase { PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 enum InputState { IDLE, ACTING }
 
 const ROUND_LIMIT: int = 20
-const EXTRACTION_POS := Vector2i(5, 2)
-const DANGER_PAY := 150
+
+var _mission: Dictionary = {}
+var _objective_type: int = CampaignData.ObjectiveType.EXTRACTION
+var _objective_data: Dictionary = {}
+var _item_collected: bool = false
+var _survive_rounds: int = 8
 
 var units: Array[Unit] = []
 var game_phase: GamePhase = GamePhase.PLAYER_TURN
@@ -17,6 +21,8 @@ var dropped_loot: Array[GearItem] = []
 var rival_rank: int = 1
 var hazard_manager: HazardSystem = null
 var _skip_requested: bool = false
+var _show_cutaway: bool = true
+var _debug_mode: bool = false
 
 # unit_id → {is_leader: bool, gear: [{item_id, slot, state: int (GearState enum)}]}
 var _gear_archive: Dictionary = {}
@@ -37,98 +43,126 @@ func _ready() -> void:
 	hud.end_turn_pressed.connect(_on_end_turn)
 	hud.field_patch_pressed.connect(_on_field_patch)
 	hud.skip_pressed.connect(func() -> void: _skip_requested = true)
+	hud.cutaway_toggled.connect(func(on: bool) -> void: _show_cutaway = on)
+	hud.debug_toggled.connect(func(on: bool) -> void: _debug_mode = on)
+
+	var gs: Node = get_node("/root/GameState")
+	_mission = CampaignData.get_mission(gs.current_campaign_id, gs.current_mission_index)
+	_objective_type = _mission.get("objective", CampaignData.ObjectiveType.EXTRACTION)
+	_objective_data = _mission.get("objective_data", {})
+	_survive_rounds = _objective_data.get("survive_rounds", 8)
+
+	grid_manager.load_map(_mission.get("map_id", "map-prototype"))
+
+	match _objective_type:
+		CampaignData.ObjectiveType.EXTRACTION:
+			var t: Vector2i = _objective_data.get("target_tile", Vector2i(5, 2))
+			grid_manager.set_extraction_tile(GridPos.new(t.x, t.y))
+		CampaignData.ObjectiveType.RETRIEVE:
+			var item_pos: Vector2i = _objective_data.get("item_tile", Vector2i(5, 5))
+			grid_manager.set_extraction_tile(GridPos.new(item_pos.x, item_pos.y))
+
 	hazard_manager = HazardSystem.new()
-	rival_rank = get_node("/root/GameState").vanguard_rank
-	grid_manager.set_extraction_tile(GridPos.new(EXTRACTION_POS.x, EXTRACTION_POS.y))
-	_spawn_units()
+	rival_rank = gs.vanguard_rank
+
+	_spawn_units_from_mission()
+
+	var camp := CampaignData.get_campaign(gs.current_campaign_id)
+	var mission_count := CampaignData.get_mission_count(gs.current_campaign_id)
 	hud.set_round(round_number)
-	hud.log("[CONTAINMENT BREACH INITIATED]")
-	hud.log("OBJECTIVE: Move ALPHA to Evidence Locker — Zone C [col 5, row 2]")
+	hud.log("[%s — MISSION %d/%d: %s]" % [
+		camp.get("title", ""),
+		gs.current_mission_index + 1,
+		mission_count,
+		_mission.get("title", "")
+	])
+	hud.log("OBJECTIVE: " + _mission.get("hud_objective", ""))
 	hud.log("[ROUND 1 — PLAYER TURN]")
 
 # ---------------------------------------------------------------------------
 # Unit setup
 # ---------------------------------------------------------------------------
 
-func _spawn_units() -> void:
+func _spawn_units_from_mission() -> void:
 	var saved_gear: Array = get_node("/root/GameState").crew
+	var player_spawns: Array = _mission.get("player_spawns", [])
+
+	var alpha_pos := _get_spawn_pos(player_spawns, "ALPHA",   Vector2i(5, 17))
+	var bravo_pos := _get_spawn_pos(player_spawns, "BRAVO",   Vector2i(3, 16))
+	var charlie_pos := _get_spawn_pos(player_spawns, "CHARLIE", Vector2i(7, 16))
 
 	var alpha := _make_unit("ALPHA", true, true, 6, 2, 3, 4)
 	alpha.gear.append(GearItem.make_weapon("PLASMA-CUTTER", 2, 3))
 	alpha.gear.append(GearItem.make_medical_kit("FIELD-PATCH-KIT"))
-	_place(alpha, GridPos.new(5, 17))
+	_place(alpha, GridPos.new(alpha_pos.x, alpha_pos.y))
 	_apply_saved_gear(alpha, saved_gear)
-	_apply_starting_fractured_gear(alpha)
+	if saved_gear.is_empty():
+		_apply_starting_fractured_gear(alpha)
 	_archive_unit(alpha)
 
 	var bravo := _make_unit("BRAVO", true, false, 5, 2, 4, 2)
 	bravo.gear.append(GearItem.make_weapon("IMPACT-WRENCH", 1, 2))
 	bravo.gear.append(GearItem.make_armor("WORK-HARNESS", 1))
-	_place(bravo, GridPos.new(3, 16))
+	_place(bravo, GridPos.new(bravo_pos.x, bravo_pos.y))
 	_apply_saved_gear(bravo, saved_gear)
 	_archive_unit(bravo)
 
 	var charlie := _make_unit("CHARLIE", true, false, 4, 3, 3, 5)
 	charlie.gear.append(GearItem.make_weapon("LONG-BORE-DRILL", 1, 2))
-	_place(charlie, GridPos.new(7, 16))
+	_place(charlie, GridPos.new(charlie_pos.x, charlie_pos.y))
 	_apply_saved_gear(charlie, saved_gear)
 	_archive_unit(charlie)
 
-	var s1 := _make_unit("SENTINEL-1", false, false, 4, 2, 2, 2)
-	s1.archetype = Unit.Archetype.GUARDIAN
-	s1.zone_min_row = 8
-	s1.zone_max_row = 12
-	s1.patrol_path = [GridPos.new(3, 8), GridPos.new(3, 11)]
-	_place(s1, GridPos.new(3, 8))
-
-	var s2 := _make_unit("SENTINEL-2", false, false, 4, 2, 2, 2)
-	s2.archetype = Unit.Archetype.GUARDIAN
-	s2.zone_min_row = 8
-	s2.zone_max_row = 12
-	s2.patrol_path = [GridPos.new(8, 8), GridPos.new(8, 11)]
-	_place(s2, GridPos.new(8, 8))
-
-	var p1 := _make_unit("PRISONER-1", false, false, 3, 2, 4, 1)
-	p1.archetype = Unit.Archetype.RAMPAGING
-	_place(p1, GridPos.new(4, 14))
-
-	var p2 := _make_unit("PRISONER-2", false, false, 3, 2, 4, 1)
-	p2.archetype = Unit.Archetype.RAMPAGING
-	_place(p2, GridPos.new(7, 14))
+	for ec: Dictionary in _mission.get("enemy_config", []):
+		_spawn_enemy_from_config(ec)
 
 	_spawn_vanguard()
 
+func _get_spawn_pos(spawns: Array, unit_id: String, default_pos: Vector2i) -> Vector2i:
+	for s: Dictionary in spawns:
+		if s.get("id", "") == unit_id:
+			return s.get("pos", default_pos)
+	return default_pos
+
+func _spawn_enemy_from_config(ec: Dictionary) -> void:
+	var e := _make_unit(ec["id"], false, false, ec["hp"], ec["cs"], ec["spd"], ec["rng"])
+	e.archetype = ec["archetype"]
+	match e.archetype:
+		Unit.Archetype.GUARDIAN:
+			e.zone_min_row = ec.get("zone_min", -1)
+			e.zone_max_row = ec.get("zone_max", -1)
+			for pv: Vector2i in ec.get("patrol", []):
+				e.patrol_path.append(GridPos.new(pv.x, pv.y))
+		Unit.Archetype.TACTICAL:
+			e.advance_triggered = false
+	for g: Dictionary in ec.get("gear", []):
+		match g.get("slot", ""):
+			"weapon":  e.gear.append(GearItem.make_weapon(g["id"], g.get("mod", 1), g.get("rng", 2)))
+			"armor":   e.gear.append(GearItem.make_armor(g["id"], g.get("mod", 1)))
+			"medical": e.gear.append(GearItem.make_medical_kit(g["id"]))
+	var pos: Vector2i = ec.get("pos", Vector2i(5, 10))
+	_place(e, GridPos.new(pos.x, pos.y))
+
 func _spawn_vanguard() -> void:
+	var vspawns: Array = _mission.get("vanguard_spawns", [])
+	if vspawns.is_empty():
+		return
 	var count := 2 if rival_rank == 1 else 3
-
-	var v1 := _make_unit("VANGUARD-1", false, false, 5, 2, 2, 3)
-	v1.archetype = Unit.Archetype.TACTICAL
-	v1.zone_min_row = 14
-	v1.zone_max_row = 18
-	v1.vanguard_rank = rival_rank
-	v1.gear.append(GearItem.make_weapon("SALVAGE-PISTOL", 1, 2))
-	_place(v1, GridPos.new(3, 18))
-
-	var v2 := _make_unit("VANGUARD-2", false, false, 5, 2, 2, 3)
-	v2.archetype = Unit.Archetype.TACTICAL
-	v2.zone_min_row = 14
-	v2.zone_max_row = 18
-	v2.vanguard_rank = rival_rank
-	if rival_rank >= 2:
-		v2.gear.append(GearItem.make_armor("BALLISTIC-PLATE", 1))
-	v2.gear.append(GearItem.make_weapon("SALVAGE-PISTOL", 1, 2))
-	_place(v2, GridPos.new(8, 18))
-
-	if count >= 3:
-		var v3 := _make_unit("VANGUARD-3", false, false, 5, 2, 2, 3)
-		v3.archetype = Unit.Archetype.TACTICAL
-		v3.zone_min_row = 14
-		v3.zone_max_row = 18
-		v3.vanguard_rank = rival_rank
-		v3.gear.append(GearItem.make_weapon("SALVAGE-PISTOL", 1, 2))
-		if rival_rank >= 3:
-			v3.gear.append(GearItem.make_medical_kit("VANGUARD-MEDKIT"))
-		_place(v3, GridPos.new(6, 18))
+	var to_spawn := mini(count, vspawns.size())
+	for i in to_spawn:
+		var vs: Dictionary = vspawns[i]
+		var vpos: Vector2i = vs.get("pos", Vector2i(5, 18))
+		var v := _make_unit("VANGUARD-%d" % (i + 1), false, false, 5, 2, 2, 3)
+		v.archetype = Unit.Archetype.TACTICAL
+		v.zone_min_row = vs.get("zone_min", 14)
+		v.zone_max_row = vs.get("zone_max", 18)
+		v.vanguard_rank = rival_rank
+		if i == 1 and rival_rank >= 2:
+			v.gear.append(GearItem.make_armor("BALLISTIC-PLATE", 1))
+		if i == 2 and rival_rank >= 3:
+			v.gear.append(GearItem.make_medical_kit("VANGUARD-MEDKIT"))
+		v.gear.append(GearItem.make_weapon("SALVAGE-PISTOL", 1, 2))
+		_place(v, GridPos.new(vpos.x, vpos.y))
 
 func _make_unit(id: String, player: bool, leader: bool,
 		hp: int, cs: int, spd: int, rng: int) -> Unit:
@@ -147,6 +181,16 @@ func _make_unit(id: String, player: bool, leader: bool,
 
 func _place(unit: Unit, pos: GridPos) -> void:
 	unit.place_at(pos, grid_manager)
+	_update_unit_cover(unit)
+
+func _update_unit_cover(unit: Unit) -> void:
+	var cover := CoverSystem.get_cover_type(unit.grid_pos, grid_manager)
+	if cover != unit.cover_type:
+		unit.cover_type = cover
+		match cover:
+			CoverSystem.CoverType.LIGHT: unit.cover_integrity = CombatConstants.COVER_INTEGRITY_LIGHT
+			CoverSystem.CoverType.HEAVY: unit.cover_integrity = CombatConstants.COVER_INTEGRITY_HEAVY
+			_: unit.cover_integrity = 0
 
 # ---------------------------------------------------------------------------
 # Gear archive helpers
@@ -263,6 +307,7 @@ func _enter_idle() -> void:
 	grid_manager.clear_all_highlights()
 	hud.show_unit(null)
 	hud.set_field_patch_visible(false)
+	hud.set_precision_indicator(false)
 	input_state = InputState.IDLE
 
 func _refresh_highlights() -> void:
@@ -278,14 +323,19 @@ func _refresh_highlights() -> void:
 
 	if not active_unit.has_attacked:
 		var atk: Array[GridPos] = []
+		var any_precision := false
 		for u in units:
 			if u.is_player == active_unit.is_player or u.is_downed:
 				continue
 			if _can_attack(active_unit, u):
 				atk.append(u.grid_pos)
+				if PrecisionStrike.can_use(active_unit, u):
+					any_precision = true
 		grid_manager.set_attack_highlights(atk)
+		hud.set_precision_indicator(any_precision)
 	else:
 		grid_manager.set_attack_highlights([])
+		hud.set_precision_indicator(false)
 
 	hud.show_unit(active_unit)
 	hud.set_field_patch_visible(_can_field_patch(active_unit))
@@ -310,17 +360,62 @@ func _can_attack(attacker: Unit, target: Unit) -> bool:
 	return LOSCalculator.has_los(attacker.grid_pos, target.grid_pos, grid_manager)
 
 func _do_move(unit: Unit, pos: GridPos) -> void:
+	var old_pos := unit.grid_pos
 	unit.place_at(pos, grid_manager)
 	unit.has_moved = true
+	# Update facing direction
+	var dx := pos.x - old_pos.x
+	var dy := pos.y - old_pos.y
+	if dx != 0 or dy != 0:
+		unit.facing = Vector2i(signi(dx), signi(dy))
+	# Update cover state for new position
+	_update_unit_cover(unit)
 	hud.log("%s → [%d,%d]" % [unit.unit_id, pos.x, pos.y])
-	if unit.is_leader and pos.x == EXTRACTION_POS.x and pos.y == EXTRACTION_POS.y:
-		hud.log("=== EVIDENCE SECURED — EXTRACTION SUCCESSFUL ===")
-		_on_mission_success()
+	if not unit.is_leader:
+		return
+	match _objective_type:
+		CampaignData.ObjectiveType.EXTRACTION:
+			var target: Vector2i = _objective_data.get("target_tile", Vector2i(-1, -1))
+			if pos.x == target.x and pos.y == target.y:
+				hud.log("=== EXTRACTION SUCCESSFUL ===")
+				_on_mission_success()
+		CampaignData.ObjectiveType.RETRIEVE:
+			var item_pos: Vector2i = _objective_data.get("item_tile", Vector2i(-1, -1))
+			var extract_pos: Vector2i = _objective_data.get("extract_tile", Vector2i(-1, -1))
+			if not _item_collected and pos.x == item_pos.x and pos.y == item_pos.y:
+				_item_collected = true
+				grid_manager.set_extraction_tile(GridPos.new(extract_pos.x, extract_pos.y))
+				hud.log("=== EVIDENCE RECOVERED — REACH EXTRACTION POINT ===")
+			elif _item_collected and pos.x == extract_pos.x and pos.y == extract_pos.y:
+				hud.log("=== VEHICLE BAY REACHED — GETAWAY SUCCESSFUL ===")
+				_on_mission_success()
 
 func _do_attack(attacker: Unit, target: Unit) -> void:
-	var dmg := attacker.get_weapon_damage()
 	var pre_tgh := target.toughness
-	var result := CombatResolver.resolve_damage(target, dmg)
+	var dmg: int
+	var result: int
+	if _debug_mode and not target.is_player:
+		dmg = target.max_toughness
+		target.toughness = 0
+		target.is_downed = true
+		target.queue_redraw()
+		result = Unit.DamageResult.DOWNED
+	else:
+		var is_precision := PrecisionStrike.can_use(attacker, target)
+		if is_precision:
+			dmg = PrecisionStrike.get_damage(attacker)
+			result = CombatResolver.resolve_damage_ex(attacker, target, dmg, true, grid_manager)
+			CombatResolver.apply_status(target, StatusEffect.Type.SUPPRESSED)
+			hud.set_precision_indicator(false)
+		else:
+			dmg = attacker.get_weapon_damage()
+			result = CombatResolver.resolve_damage_ex(attacker, target, dmg, false, grid_manager)
+		# Chip cover integrity on each hit
+		if target.cover_integrity > 0:
+			target.cover_integrity -= 1
+			if target.cover_integrity == 0:
+				grid_manager.damage_cover_at(target.grid_pos)
+				target.cover_type = CoverSystem.CoverType.NONE
 	attacker.has_attacked = true
 	match result:
 		Unit.DamageResult.NORMAL:
@@ -340,8 +435,9 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 		Unit.DamageResult.DOWNED:
 			hud.log("%s → %s  -%d TGH — DOWNED" % [
 				attacker.unit_id, target.unit_id, dmg])
-	cutaway.queue_event(attacker, target, dmg, result, pre_tgh)
-	await cutaway.play_pending()
+	if _show_cutaway:
+		cutaway.queue_event(attacker, target, dmg, result, pre_tgh)
+		await cutaway.play_pending()
 	if target.is_downed:
 		var leader_fell := _flush_downed()
 		if leader_fell:
@@ -439,11 +535,12 @@ func _run_enemy_phase() -> void:
 		if not is_instance_valid(enemy) or enemy.is_downed:
 			continue
 
+		enemy.tick_turn_start()
 		enemy.is_acting = true
 		enemy.queue_redraw()
 		hud.show_unit(enemy)
 
-		var cq: Object = null if _skip_requested else cutaway
+		var cq: Object = null if (_skip_requested or not _show_cutaway) else cutaway
 		var lines: Array[String] = []
 		match enemy.archetype:
 			Unit.Archetype.GUARDIAN:
@@ -459,7 +556,7 @@ func _run_enemy_phase() -> void:
 			enemy.is_acting = false
 			enemy.queue_redraw()
 
-		if not _skip_requested and cutaway.has_pending():
+		if not _skip_requested and _show_cutaway and cutaway.has_pending():
 			await cutaway.play_pending()
 		elif cutaway.has_pending():
 			cutaway.clear_pending()
@@ -512,6 +609,12 @@ func _run_enemy_phase() -> void:
 	await get_tree().create_timer(0.0 if skip_was_requested else 0.4).timeout
 
 	round_number += 1
+
+	if _objective_type == CampaignData.ObjectiveType.SURVIVAL and round_number > _survive_rounds:
+		hud.log("=== CORRIDOR HELD — DOORS CUT — BREAKOUT SUCCESSFUL ===")
+		_on_mission_success()
+		return
+
 	if round_number > ROUND_LIMIT:
 		hud.log("=== ROUND LIMIT REACHED — MISSION FAILED ===")
 		_on_mission_fail("ROUND LIMIT EXPIRED")
@@ -521,6 +624,8 @@ func _run_enemy_phase() -> void:
 		if not u.is_downed:
 			u.has_moved = false
 			u.has_attacked = false
+			if u.is_player:
+				u.tick_turn_start()
 			u.queue_redraw()
 
 	var next_zone := hazard_manager.get_active_zone(round_number)
@@ -539,6 +644,12 @@ func _flush_downed() -> bool:
 	var to_remove: Array[Unit] = []
 	for u in units:
 		if u.is_downed:
+			if _debug_mode and u.is_player:
+				u.is_downed = false
+				u.toughness = u.max_toughness
+				u.queue_redraw()
+				hud.log("[DEBUG] %s revived" % u.unit_id)
+				continue
 			to_remove.append(u)
 			if u.is_player and u.is_leader:
 				leader_fell = true
@@ -567,12 +678,15 @@ func _check_game_over() -> void:
 		else:
 			enemies_up += 1
 
-	if enemies_up == 0:
-		hud.log("=== AREA CLEAR — CONTAINMENT BREACH COMPLETE ===")
-		_on_mission_success()
-	elif players_up == 0:
+	if players_up == 0:
 		hud.log("=== ALL CREW DOWN — MISSION FAILED ===")
 		_on_mission_fail("ALL CREW DOWN")
+	elif enemies_up == 0:
+		if _objective_type == CampaignData.ObjectiveType.ELIMINATION:
+			hud.log("=== AREA CLEAR — ALL GUARDS ELIMINATED ===")
+			_on_mission_success()
+		elif _objective_type == CampaignData.ObjectiveType.SURVIVAL:
+			hud.log("--- ALL ENEMIES DOWN — HOLD UNTIL DOORS CUT ---")
 
 # ---------------------------------------------------------------------------
 # Mission outcome
@@ -585,13 +699,34 @@ func _on_mission_success() -> void:
 	var gs: Node = get_node("/root/GameState")
 	var sm: Node = get_node("/root/SaveManager")
 	gs.crew = _build_crew_snapshot()
-	gs.credits += DANGER_PAY
 	gs.pending_loot = dropped_loot
+
+	var mission_count := CampaignData.get_mission_count(gs.current_campaign_id)
+	var campaign_complete: bool = (gs.current_mission_index + 1 >= mission_count)
+	var danger_pay: int = 0
+
+	if campaign_complete:
+		var camp := CampaignData.get_campaign(gs.current_campaign_id)
+		danger_pay = camp.get("danger_pay", 0)
+		gs.credits += danger_pay
+		gs.campaigns_completed += 1
+		gs.vanguard_rank += 1
+		rival_rank = gs.vanguard_rank
+		hud.log("=== CAMPAIGN COMPLETE — DANGER PAY: +%d CR ===" % danger_pay)
+		hud.log("VANGUARD RANK NOW %d" % gs.vanguard_rank)
+		# Advance to next campaign
+		if gs.current_campaign_id == "containment-breach":
+			gs.current_campaign_id = "prison-break"
+		gs.current_mission_index = 0
+	else:
+		gs.current_mission_index += 1
+
 	gs.last_mission_result = {
 		"success": true,
 		"fail_reason": "",
-		"danger_pay": DANGER_PAY,
-		"rival_rank": rival_rank,
+		"danger_pay": danger_pay,
+		"rival_rank": gs.vanguard_rank,
+		"campaign_complete": campaign_complete,
 	}
 	sm.save()
 	await get_tree().create_timer(1.5).timeout
@@ -599,30 +734,19 @@ func _on_mission_success() -> void:
 
 func _on_mission_fail(reason: String) -> void:
 	game_phase = GamePhase.GAME_OVER
-	rival_rank += 1
-	hud.log("VANGUARD RANK NOW %d" % rival_rank)
-
 	for u in _get_player_units():
-		for item: GearItem in u.gear:
-			if item.state == GearItem.GearState.INTACT:
-				item.state = GearItem.GearState.FRACTURED
 		_archive_unit(u)
-
-	for unit_id: String in _gear_archive:
-		for item_data: Dictionary in _gear_archive[unit_id]["gear"]:
-			if item_data.get("state", GearItem.GearState.INTACT) == GearItem.GearState.INTACT:
-				item_data["state"] = GearItem.GearState.FRACTURED
-
 	var gs: Node = get_node("/root/GameState")
 	var sm: Node = get_node("/root/SaveManager")
 	gs.crew = _build_crew_snapshot()
-	gs.vanguard_rank = rival_rank
 	gs.pending_loot = dropped_loot
+	# Gear fracture and rank change happen ONLY on Abandon (handled in PostMissionScreen)
 	gs.last_mission_result = {
 		"success": false,
 		"fail_reason": reason,
 		"danger_pay": 0,
-		"rival_rank": rival_rank,
+		"rival_rank": gs.vanguard_rank,
+		"campaign_complete": false,
 	}
 	sm.save()
 	await get_tree().create_timer(1.5).timeout
