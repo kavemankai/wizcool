@@ -115,7 +115,7 @@ func _ready() -> void:
 	var inspect_rect := Rect2(SCREEN_W - MARGIN - 240, 96, 240, 250)
 	var inspect_panel := _panel(root, inspect_rect)
 	# Crew portrait — top-centre of the panel, shown only for player units that
-	# have one. Linear filter: these are painterly photo portraits, not pixel art.
+	# have one. Linear filter: downscaled pixel-art illustrations read fine soft.
 	_unit_portrait = TextureRect.new()
 	_unit_portrait.set_position(Vector2(78, 6))
 	_unit_portrait.set_size(Vector2(84, 84))
@@ -129,8 +129,9 @@ func _ready() -> void:
 	_unit_label.add_theme_font_size_override("font_size", FS_UNIT)
 	_unit_label.add_theme_color_override("font_color", PARCHMENT)
 
-	# Preload portraits (player crew + named Vanguard rival crew) if imported.
-	# Keyed by unit_id. SENTINEL/PRISONER are faceless types — no portrait.
+	# Preload portraits if imported. Player crew + named Vanguard rival crew key
+	# by exact unit_id; SENTINEL/PRISONER are archetype types so any unit whose
+	# id starts with that name resolves to the shared face (see _portrait_key).
 	var portrait_paths := {
 		"ALPHA": "res://assets/portraits/portrait_player_alpha.png",
 		"BRAVO": "res://assets/portraits/portrait_player_bravo.png",
@@ -138,6 +139,8 @@ func _ready() -> void:
 		"VANGUARD-1": "res://assets/portraits/portrait_enemy_vanguard_leader.png",
 		"VANGUARD-2": "res://assets/portraits/portrait_enemy_vanguard_soldier.png",
 		"VANGUARD-3": "res://assets/portraits/portrait_enemy_vanguard_tech.png",
+		"SENTINEL": "res://assets/portraits/portrait_enemy_sentinel.png",
+		"PRISONER": "res://assets/portraits/portrait_enemy_prisoner.png",
 	}
 	for pid: String in portrait_paths:
 		var ppath: String = portrait_paths[pid]
@@ -316,6 +319,18 @@ func set_field_patch_visible(show_btn: bool) -> void:
 func set_skip_visible(show_btn: bool) -> void:
 	_skip_btn.visible = show_btn
 
+## Resolve a unit_id to a loaded portrait key, or "" if none.
+## Exact match for named crew; prefix match for archetype types (SENTINEL-1,
+## PRISONER-2, … all share one face).
+func _portrait_key(unit_id: String) -> String:
+	if _portraits.has(unit_id):
+		return unit_id
+	if unit_id.begins_with("SENTINEL") and _portraits.has("SENTINEL"):
+		return "SENTINEL"
+	if unit_id.begins_with("PRISONER") and _portraits.has("PRISONER"):
+		return "PRISONER"
+	return ""
+
 ## Show/hide the USE ABILITY button and set its label to the ability name.
 func set_ability_visible(show_btn: bool, label: String = "") -> void:
 	_ability_btn.visible = show_btn
@@ -340,8 +355,9 @@ func show_unit(unit: Unit) -> void:
 		_unit_label.size = Vector2(220, 234)
 		return
 	# Portrait: show it and drop the stat text below; otherwise full panel.
-	if _portraits.has(unit.unit_id):
-		_unit_portrait.texture = _portraits[unit.unit_id]
+	var pkey := _portrait_key(unit.unit_id)
+	if pkey != "":
+		_unit_portrait.texture = _portraits[pkey]
 		_unit_portrait.visible = true
 		_unit_label.position = Vector2(10, 96)
 		_unit_label.size = Vector2(220, 146)
