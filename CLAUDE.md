@@ -84,10 +84,16 @@ var archetype: int             # enemies only
 
 ## Phase Build Order
 
-- **Phase 1–10:** ✅ Complete — grid shell → combat → AI → gear economy → hazards → rival → mission loop → terminal hub → prototype mission → polish
-- **Audit:** ✅ Complete — CombatResolver, GameState/SaveManager autoloads, signal architecture
-- **Phase 11:** ✅ Complete — CombatCutaway overlay, slow enemy phase, skip button, enemy inspection, ranged bullet animation, fade in/out, result slam, gear badge, fast-mode toggle
-- **Phase 12 (current):** Combat depth — cover system integration, precision strikes, AoE resolver, weapon specials (suppressing fire, corrosive burst, arc pulse, sealant pack), status effects (SUPPRESSED / CORRODED / OVERLOADED), audio foundation (SFX/music buses + first sounds)
+- **Phase 1–12:** ✅ Complete — full prototype: grid → combat → AI → gear economy → hazards → rival crew → mission loop → hub → polish → combat depth (cover/precision/AoE/specials/status) → audio foundation
+- **v1.0 Release Plan** (mobile game, see `.claude/plans` / git history):
+  - **R1 Graze combat** ✅ — deterministic CLEAN/GRAZE/DEFLECTED tier ladder, two-tap attack preview, tier-aware AI
+  - **R2 Sprite tech** ✅ — textured _draw with full programmatic fallbacks (SpriteLib; art lands incrementally)
+  - **R3 Art generation** ⏳ — unit standees, tileset, title/icons (SpriteCook plugin or Flow pipeline)
+  - **R4 App shell** ✅ — TitleScreen (main_scene), SettingsMenu (user://settings.cfg), PauseMenu, Android back button
+  - **R5 Audio** ✅ SFX (procedural, tools/generate_sfx.py) / ⏳ chiptune music loops (user-approved CC0 download)
+  - **R6 Campaign** ✅ — "First Repossession" 5-mission beginner job (colony-repossession, default campaign); old campaigns are unlockable bonus contracts via hub contract select
+  - **R7 Android export** ✅ config (gl_compatibility, export_presets.cfg, docs/release/android.md) / ⏳ user-manual SDK+keystore+device test
+  - **R8 Release QA** ⏳ — store assets, device checklist, full playthrough
 
 ## Enemy Archetypes
 
