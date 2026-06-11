@@ -536,6 +536,9 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 	if GameState.show_cutaway:
 		cutaway.queue_event(attacker, target, dmg, result, pre_tgh, tier)
 		await cutaway.play_pending()
+	else:
+		AudioManager.play_weapon(attacker)
+		AudioManager.play_result(result)
 	if target.is_downed:
 		var leader_fell := _flush_downed()
 		if leader_fell:
@@ -701,6 +704,7 @@ func _on_field_patch() -> void:
 	active_unit.gear.remove_at(kit_index)
 	active_unit.has_attacked = true
 	active_unit.queue_redraw()
+	AudioManager.play_sfx("field_patch")
 	hud.log("%s FIELD-PATCHES %s [MODIFIER PARTIALLY RESTORED]" % [
 		active_unit.unit_id, target_item.item_id])
 	_refresh_highlights()
@@ -761,6 +765,9 @@ func _run_enemy_phase() -> void:
 				lines = TacticalAI.take_turn(enemy, units, grid_manager, round_number, cq)
 		for line in lines:
 			hud.log(line)
+
+		if enemy.has_attacked and not GameState.show_cutaway and not _skip_requested:
+			AudioManager.play_weapon(enemy)
 
 		if is_instance_valid(enemy):
 			enemy.is_acting = false

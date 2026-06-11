@@ -11,6 +11,7 @@ var _newjob_dialog: ConfirmationDialog
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	AudioManager.start_music_calm()
 
 	var bg := ColorRect.new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)

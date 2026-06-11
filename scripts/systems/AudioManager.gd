@@ -71,7 +71,7 @@ func _build_sfx_players() -> void:
 		var player := AudioStreamPlayer.new()
 		player.name = slot
 		player.bus = &"SFX"
-		player.stream = null
+		player.stream = _load_sfx_stream(slot)
 		add_child(player)
 		_sfx_players[slot] = player
 
@@ -79,24 +79,59 @@ func _build_sfx_players() -> void:
 		var player := AudioStreamPlayer.new()
 		player.name = slot
 		player.bus = &"UI"
-		player.stream = null
+		player.stream = _load_sfx_stream(slot)
 		add_child(player)
 		_sfx_players[slot] = player
+
+func _load_sfx_stream(slot: String) -> AudioStream:
+	var path := "res://assets/audio/sfx/sfx_%s.wav" % slot
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
+
+## Play the firing sound matching a unit's equipped weapon.
+func play_weapon(unit: Unit) -> void:
+	for item: GearItem in unit.gear:
+		if item.slot == "weapon":
+			match item.item_id:
+				"PLASMA-CUTTER":   play_sfx("weapon_plasma_cutter")
+				"IMPACT-WRENCH":   play_sfx("weapon_impact_wrench")
+				"LONG-BORE-DRILL": play_sfx("weapon_long_bore_drill")
+				_:                 play_sfx("weapon_salvage_pistol")
+			return
+	play_sfx("weapon_salvage_pistol")
+
+## Play the consequence sound for a DamageResult.
+func play_result(result: int) -> void:
+	match result:
+		Unit.DamageResult.GEAR_FRACTURED:
+			play_sfx("gear_fracture")
+		Unit.DamageResult.GEAR_BROKEN:
+			play_sfx("gear_break")
+			play_sfx("unit_downed")
+		Unit.DamageResult.DOWNED:
+			play_sfx("unit_downed")
 
 func _build_music_players() -> void:
 	_music_calm = AudioStreamPlayer.new()
 	_music_calm.name = "MusicCalm"
 	_music_calm.bus = &"Music"
-	_music_calm.stream = null
+	_music_calm.stream = _load_music_stream("music_ambient_calm")
 	_music_calm.volume_db = 0.0
 	add_child(_music_calm)
 
 	_music_tension = AudioStreamPlayer.new()
 	_music_tension.name = "MusicTension"
 	_music_tension.bus = &"Music"
-	_music_tension.stream = null
+	_music_tension.stream = _load_music_stream("music_ambient_tension")
 	_music_tension.volume_db = -80.0
 	add_child(_music_tension)
+
+func _load_music_stream(track: String) -> AudioStream:
+	var path := "res://assets/audio/music/%s.ogg" % track
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
 
 # ---------------------------------------------------------------------------
 # Public API — SFX

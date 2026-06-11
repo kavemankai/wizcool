@@ -108,6 +108,7 @@ func _finish() -> void:
 	if not _playing:
 		return
 	_playing = false
+	AudioManager.play_sfx("cutaway_dismiss")
 	if is_instance_valid(_anim_tween):
 		_anim_tween.kill()
 	if is_instance_valid(_fade_tween):
@@ -178,6 +179,7 @@ func _populate_panels() -> void:
 func _update_tgh_label() -> void:
 	if not is_instance_valid(_target):
 		return
+	AudioManager.play_result(_result)
 	match _result:
 		Unit.DamageResult.GEAR_FRACTURED:
 			_def_tgh_label.text = "TOUGHNESS  %d / %d  [RESET]" % [
@@ -233,6 +235,7 @@ func _reset_sprite_positions() -> void:
 func _play_attack_animation() -> void:
 	if not is_instance_valid(_attacker) or not is_instance_valid(_target):
 		return
+	AudioManager.play_weapon(_attacker)
 
 	if is_instance_valid(_anim_tween):
 		_anim_tween.kill()
