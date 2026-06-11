@@ -35,6 +35,14 @@ func _ready() -> void:
 	_row(vbox, "  — Round 20 expires")
 	_row(vbox, "")
 
+	# Mission teaching tips (beginner campaign ramps one mechanic per job).
+	var tips: Array = mission.get("briefing_tips", [])
+	if not tips.is_empty():
+		_row(vbox, "FIELD NOTES")
+		for tip: String in tips:
+			_row(vbox, "  " + tip)
+		_row(vbox, "")
+
 	var btn := Button.new()
 	btn.text = "BEGIN MISSION"
 	btn.custom_minimum_size = Vector2(0, 72)

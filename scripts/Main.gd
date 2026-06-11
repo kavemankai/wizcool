@@ -940,9 +940,8 @@ func _on_mission_success() -> void:
 		rival_rank = gs.vanguard_rank
 		hud.log("=== CAMPAIGN COMPLETE — DANGER PAY: +%d CR ===" % danger_pay)
 		hud.log("VANGUARD RANK NOW %d" % gs.vanguard_rank)
-		# Advance to next campaign
-		if gs.current_campaign_id == "containment-breach":
-			gs.current_campaign_id = "prison-break"
+		# No auto-chain: completing a contract unlocks the bonus contracts
+		# in the Terminal Hub contract select.
 		gs.current_mission_index = 0
 	else:
 		gs.current_mission_index += 1

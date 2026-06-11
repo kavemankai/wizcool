@@ -44,10 +44,107 @@ func load_map(map_id: String) -> void:
 		"map-supply-depot":    _place_map_supply_depot()
 		"map-security-block":  _place_map_security_block()
 		"map-cell-corridor":   _place_map_cell_corridor()
+		"map-colony-survey":   _place_map_colony_survey()
+		"map-colony-depot":    _place_map_colony_depot()
+		"map-colony-comms":    _place_map_colony_comms()
+		"map-colony-security": _place_map_colony_security()
+		"map-colony-yard":     _place_map_colony_yard()
 		_:
 			push_warning("GridManager: unknown map_id '%s', loading prototype" % map_id)
 			_place_map_prototype()
 	queue_redraw()
+
+func _place_perimeter() -> void:
+	for x in GRID_WIDTH:
+		_set_tile(x, 0, TileType.WALL)
+		_set_tile(x, GRID_HEIGHT - 1, TileType.WALL)
+	for y in GRID_HEIGHT:
+		_set_tile(0, y, TileType.WALL)
+		_set_tile(GRID_WIDTH - 1, y, TileType.WALL)
+
+# --- First Repossession campaign maps (colony) ------------------------------
+
+## M1 SITE SURVEY — a narrow survey corridor. Deliberately tiny: teaches
+## move / attack / extract with nowhere to get lost.
+func _place_map_colony_survey() -> void:
+	_place_perimeter()
+	# Wall off the flanks: playable corridor is x 4–7.
+	for y in range(1, GRID_HEIGHT - 1):
+		for x in [1, 2, 3, 8, 9, 10]:
+			_set_tile(x, y, TileType.WALL)
+	# Three cover pieces stepping up the corridor.
+	_set_cover_tile(5, 12)
+	_set_cover_tile(6, 9)
+	_set_cover_tile(4, 6)
+
+## M2 ASSET TAGGING — depot aisles with cover lanes. Teaches the graze
+## preview: every approach offers a covered shot and a flanking route.
+func _place_map_colony_depot() -> void:
+	_place_perimeter()
+	# Two storage racks splitting the floor into three aisles.
+	for y in range(4, 9):
+		_set_tile(3, y, TileType.WALL)
+		_set_tile(8, y, TileType.WALL)
+	for y in range(11, 16):
+		_set_tile(5, y, TileType.WALL)
+		_set_tile(6, y, TileType.WALL)
+	# Cover lanes — pairs the player can leapfrog between.
+	_set_cover_tile(2, 13); _set_cover_tile(9, 13)
+	_set_cover_tile(4, 10); _set_cover_tile(7, 10)
+	_set_cover_tile(2, 7);  _set_cover_tile(9, 7)
+	_set_cover_tile(5, 5); _set_cover_tile(6, 5)
+
+## M3 CONTESTED CLAIM — comms relay plaza. Open centre with cover clusters;
+## the Vanguard cut in from the top mid-mission.
+func _place_map_colony_comms() -> void:
+	_place_perimeter()
+	# Relay building stubs left and right.
+	for y in range(7, 10):
+		_set_tile(2, y, TileType.WALL)
+		_set_tile(9, y, TileType.WALL)
+	# Central cover clusters.
+	_set_cover_tile(5, 13); _set_cover_tile(6, 13)
+	_set_cover_tile(3, 10); _set_cover_tile(8, 10)
+	_set_cover_tile(5, 7);  _set_cover_tile(6, 7)
+	_set_cover_tile(4, 4);  _set_cover_tile(7, 4)
+	set_cover_tier(GridPos.new(5, 7), 2)   # heavy cover at the midline
+	set_cover_tier(GridPos.new(6, 7), 2)
+
+## M4 SECURITY LOCKOUT — the colony security wing. Chokepoints + the
+## hazard rows (8–12) make the midfield dangerous ground.
+func _place_map_colony_security() -> void:
+	_place_perimeter()
+	# Security checkpoint chokewall at row 7 with two doors.
+	for x in GRID_WIDTH:
+		if x != 3 and x != 8:
+			_set_tile(x, 7, TileType.WALL)
+	# Holding cells bottom-left / bottom-right.
+	for y in range(11, 14):
+		_set_tile(3, y, TileType.WALL)
+		_set_tile(8, y, TileType.WALL)
+	# Cover at the door approaches and inside the wing.
+	_set_cover_tile(3, 9);  _set_cover_tile(8, 9)
+	_set_cover_tile(2, 5);  _set_cover_tile(9, 5)
+	_set_cover_tile(5, 4);  _set_cover_tile(6, 4)
+	set_cover_tier(GridPos.new(5, 4), 2)
+	set_cover_tier(GridPos.new(6, 4), 2)
+	_set_cover_tile(4, 15); _set_cover_tile(7, 15)
+
+## M5 FINAL NOTICE — the loading yard. Big open finale: long sightlines,
+## scattered cover, the full Vanguard crew arriving early.
+func _place_map_colony_yard() -> void:
+	_place_perimeter()
+	# Cargo stacks.
+	_set_tile(3, 5, TileType.WALL);  _set_tile(4, 5, TileType.WALL)
+	_set_tile(7, 11, TileType.WALL); _set_tile(8, 11, TileType.WALL)
+	_set_tile(2, 14, TileType.WALL)
+	# Scattered crates (cover) across the yard.
+	_set_cover_tile(6, 15); _set_cover_tile(3, 12)
+	_set_cover_tile(5, 10); _set_cover_tile(9, 9)
+	_set_cover_tile(2, 8);  _set_cover_tile(6, 7)
+	_set_cover_tile(8, 5);  _set_cover_tile(4, 3)
+	set_cover_tier(GridPos.new(6, 7), 2)
+	set_cover_tier(GridPos.new(4, 3), 2)
 
 func _init_tiles() -> void:
 	tiles.resize(GRID_WIDTH)

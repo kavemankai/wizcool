@@ -60,17 +60,21 @@ func _ready() -> void:
 
 	_row(vbox, "")
 	_row(vbox, "── CONTRACT SELECT ──")
-	var campaign_id: String = _gs.current_campaign_id
-	var camp := CampaignData.get_campaign(campaign_id)
-	var mission_count := CampaignData.get_mission_count(campaign_id)
-	var mission_idx: int = _gs.current_mission_index
-	var cur_mission := CampaignData.get_mission(campaign_id, mission_idx)
-	if mission_idx == 0:
-		_row(vbox, "  [ACTIVE]  %s  —  %s" % [camp.get("title", ""), camp.get("description", "")])
-		_row(vbox, "  MISSION 1/%d  —  %s" % [mission_count, cur_mission.get("title", "")])
-	else:
-		_row(vbox, "  [IN PROGRESS]  %s  —  MISSION %d/%d" % [camp.get("title", ""), mission_idx + 1, mission_count])
-		_row(vbox, "  NEXT: %s" % cur_mission.get("title", ""))
+	# Beginner job is always open; other contracts unlock after the first
+	# completed campaign. Switching contracts resets that contract to mission 1.
+	var unlocked: bool = _gs.campaigns_completed >= 1
+	for cid: String in CampaignData.all_campaign_ids():
+		var c := CampaignData.get_campaign(cid)
+		var count := CampaignData.get_mission_count(cid)
+		if cid == _gs.current_campaign_id:
+			var idx: int = _gs.current_mission_index
+			var cur := CampaignData.get_mission(cid, idx)
+			_row(vbox, "  [ACTIVE]  %s  —  MISSION %d/%d: %s" % [
+					c.get("title", ""), idx + 1, count, cur.get("title", "")])
+		elif cid == "colony-repossession" or unlocked:
+			_add_contract_row(vbox, cid, c.get("title", ""))
+		else:
+			_row(vbox, "  [LOCKED]  %s  —  complete a contract to unlock" % c.get("title", ""))
 	_row(vbox, "")
 
 	var depart_btn := Button.new()
@@ -148,6 +152,29 @@ func _do_repair(unit_id: String, item_id: String) -> void:
 					_gs.crew = _all_crew_gear
 					_sm.save()
 					return
+
+## A selectable contract row: shows the title with a TAKE button that makes
+## it the active campaign (from its first mission) and saves immediately.
+func _add_contract_row(parent: VBoxContainer, cid: String, title: String) -> void:
+	var hbox := HBoxContainer.new()
+	parent.add_child(hbox)
+
+	var lbl := Label.new()
+	lbl.text = "  %s" % title
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(lbl)
+
+	var btn := Button.new()
+	btn.text = "TAKE CONTRACT"
+	btn.custom_minimum_size = Vector2(180, 64)
+	btn.pressed.connect(func() -> void:
+		AudioManager.play_sfx("ui_click")
+		_gs.current_campaign_id = cid
+		_gs.current_mission_index = 0
+		_sm.save()
+		get_tree().reload_current_scene()
+	)
+	hbox.add_child(btn)
 
 func _row(parent: Control, text: String) -> void:
 	var lbl := Label.new()

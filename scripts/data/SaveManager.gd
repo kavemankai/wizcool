@@ -22,6 +22,7 @@ func delete_save() -> void:
 	gs.crew = []
 	gs.pending_loot = []
 	gs.last_mission_result = {}
+	gs.current_campaign_id = "colony-repossession"
 	gs.current_mission_index = 0
 	gs.campaigns_completed = 0
 
@@ -93,7 +94,7 @@ func load_save() -> void:
 	var result: Dictionary = parsed
 	gs.credits = result.get("credits", STARTING_CREDITS)
 	gs.vanguard_rank = result.get("vanguard_rank", 1)
-	gs.current_campaign_id = result.get("current_campaign_id", "containment-breach")
+	gs.current_campaign_id = result.get("current_campaign_id", "colony-repossession")
 	gs.current_mission_index = result.get("current_mission_index", 0)
 	gs.campaigns_completed = result.get("campaigns_completed", 0)
 	var raw_crew: Array = result.get("crew", [])

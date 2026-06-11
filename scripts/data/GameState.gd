@@ -11,7 +11,7 @@ var fractured_inventory: Array[GearItem] = []
 var last_mission_result: Dictionary = {}
 var pending_loot: Array[GearItem] = []
 
-var current_campaign_id: String = "containment-breach"
+var current_campaign_id: String = "colony-repossession"
 var current_mission_index: int = 0
 var campaigns_completed: int = 0
 
