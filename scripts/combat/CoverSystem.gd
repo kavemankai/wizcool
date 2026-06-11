@@ -17,28 +17,6 @@ static func get_cover_type(pos: GridPos, grid: GridManager) -> CoverSystem.Cover
 		1:    return CoverSystem.CoverType.LIGHT
 		_:    return CoverSystem.CoverType.LIGHT  # default for unregistered COVER tiles
 
-## Calculate flat damage reduction granted by cover, accounting for gear damage.
-## Fractured gear reduces effectiveness; broken gear nullifies cover entirely.
-static func get_damage_reduction(cover: CoverSystem.CoverType, unit_gear_state: int) -> int:
-	match cover:
-		CoverSystem.CoverType.NONE:
-			return 0
-		CoverSystem.CoverType.LIGHT:
-			if unit_gear_state == GearItem.GearState.BROKEN:
-				return 0
-			var base: int = CombatConstants.COVER_REDUCTION_LIGHT
-			if unit_gear_state == GearItem.GearState.FRACTURED:
-				base -= CombatConstants.COVER_REDUCTION_FRACTURED_PENALTY
-			return max(0, base)
-		CoverSystem.CoverType.HEAVY:
-			if unit_gear_state == GearItem.GearState.BROKEN:
-				return 0
-			var base: int = CombatConstants.COVER_REDUCTION_HEAVY
-			if unit_gear_state == GearItem.GearState.FRACTURED:
-				base -= CombatConstants.COVER_REDUCTION_FRACTURED_PENALTY
-			return max(0, base)
-	return 0
-
 ## Returns true if the attacker is flanking the target.
 ## Flanking occurs when the attacker is beside or behind the target's facing direction.
 ## A target with a zero facing vector (uninitialised) is never considered flanked.

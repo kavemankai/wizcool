@@ -24,6 +24,10 @@ var _skip_requested: bool = false
 var _show_cutaway: bool = true
 var _debug_mode: bool = false
 
+# Two-tap attack confirm: first tap on an enemy previews the graze tier,
+# second tap on the same enemy commits. Cleared on any other interaction.
+var _pending_target: Unit = null
+
 # Vanguard reinforcement timing. A mission may defer the Vanguard so they
 # arrive mid-mission instead of at the start. vanguard_spawn_turn <= 1 means
 # they deploy immediately (the default for most missions).
@@ -284,16 +288,24 @@ func _handle_click(click_pos: Vector2) -> void:
 				_select(clicked_unit)
 			elif clicked_unit != null and not clicked_unit.is_player and not clicked_unit.is_downed:
 				if not active_unit.has_attacked and _can_attack(active_unit, clicked_unit):
-					await _do_attack(active_unit, clicked_unit)
-					if game_phase == GamePhase.GAME_OVER:
-						_enter_idle()
-						return
-					_refresh_highlights()
-					if not active_unit.can_act():
-						_enter_idle()
+					# Two-tap confirm: first tap previews the graze tier,
+					# second tap on the same target commits the attack.
+					if clicked_unit == _pending_target:
+						_clear_attack_preview()
+						await _do_attack(active_unit, clicked_unit)
+						if game_phase == GamePhase.GAME_OVER:
+							_enter_idle()
+							return
+						_refresh_highlights()
+						if not active_unit.can_act():
+							_enter_idle()
+					else:
+						_show_attack_preview(active_unit, clicked_unit)
 				else:
+					_clear_attack_preview()
 					hud.log("OUT OF RANGE")
 			elif not active_unit.has_moved and _is_move_tile(clicked_grid):
+				_clear_attack_preview()
 				_do_move(active_unit, clicked_grid)
 				if game_phase == GamePhase.GAME_OVER:
 					_enter_idle()
@@ -328,6 +340,7 @@ func _handle_click(click_pos: Vector2) -> void:
 func _select(unit: Unit) -> void:
 	if active_unit and active_unit != unit:
 		active_unit.deselect()
+	_clear_attack_preview()
 	active_unit = unit
 	unit.select()
 	_refresh_highlights()
@@ -335,9 +348,31 @@ func _select(unit: Unit) -> void:
 	hud.set_field_patch_visible(_can_field_patch(unit))
 	input_state = InputState.ACTING
 
+## First tap on a target: show the predicted graze tier before committing.
+func _show_attack_preview(attacker: Unit, target: Unit) -> void:
+	_pending_target = target
+	var is_precision := PrecisionStrike.can_use(attacker, target)
+	var tier: int
+	var dmg: int
+	if is_precision:
+		tier = GrazeSystem.Tier.CLEAN
+		dmg = PrecisionStrike.get_damage(attacker)
+	else:
+		tier = GrazeSystem.compute_tier(attacker, target, grid_manager)
+		dmg = GrazeSystem.apply_tier(attacker.get_weapon_damage(), tier)
+	var reason := "PRECISION" if is_precision \
+			else GrazeSystem.tier_reason(attacker, target, grid_manager)
+	hud.set_attack_preview("%s → %s  −%d  [%s]  · TAP AGAIN TO FIRE" % [
+			target.unit_id, GrazeSystem.tier_label(tier), dmg, reason])
+
+func _clear_attack_preview() -> void:
+	_pending_target = null
+	hud.set_attack_preview("")
+
 func _enter_idle() -> void:
 	if active_unit:
 		active_unit.deselect()
+	_clear_attack_preview()
 	active_unit = null
 	move_tiles = []
 	grid_manager.clear_all_highlights()
@@ -435,6 +470,7 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 	var pre_tgh := target.toughness
 	var dmg: int
 	var result: int
+	var tier: int = GrazeSystem.Tier.CLEAN
 	if _debug_mode and not target.is_player:
 		dmg = target.max_toughness
 		target.toughness = 0
@@ -449,8 +485,9 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 			CombatResolver.apply_status(target, StatusEffect.Type.SUPPRESSED)
 			hud.set_precision_indicator(false)
 		else:
-			dmg = attacker.get_weapon_damage()
-			result = CombatResolver.resolve_damage_ex(attacker, target, dmg, false, grid_manager)
+			tier = GrazeSystem.compute_tier(attacker, target, grid_manager)
+			dmg = GrazeSystem.apply_tier(attacker.get_weapon_damage(), tier)
+			result = CombatResolver.resolve_damage_ex(attacker, target, attacker.get_weapon_damage(), false, grid_manager)
 		# Chip cover integrity on each hit
 		if target.cover_integrity > 0:
 			target.cover_integrity -= 1
@@ -458,16 +495,17 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 				grid_manager.damage_cover_at(target.grid_pos)
 				target.cover_type = CoverSystem.CoverType.NONE
 	attacker.has_attacked = true
+	var tier_tag := GrazeSystem.tier_label(tier)
 	match result:
 		Unit.DamageResult.NORMAL:
-			hud.log("%s → %s  -%d TGH  [%d/%d]" % [
-				attacker.unit_id, target.unit_id, dmg,
+			hud.log("%s → %s  %s  -%d TGH  [%d/%d]" % [
+				attacker.unit_id, target.unit_id, tier_tag, dmg,
 				target.toughness, target.max_toughness])
 		Unit.DamageResult.GEAR_FRACTURED:
 			var item := _find_gear_by_state(target, GearItem.GearState.FRACTURED)
 			var slot_name := item.slot.to_upper() if item else "GEAR"
-			hud.log("%s → %s  %s FRACTURED — TGH RESET" % [
-				attacker.unit_id, target.unit_id, slot_name])
+			hud.log("%s → %s  %s  %s FRACTURED — TGH RESET" % [
+				attacker.unit_id, target.unit_id, tier_tag, slot_name])
 		Unit.DamageResult.GEAR_BROKEN:
 			var item := _find_gear_by_state(target, GearItem.GearState.BROKEN)
 			var slot_name := item.slot.to_upper() if item else "GEAR"
@@ -477,7 +515,7 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 			hud.log("%s → %s  -%d TGH — DOWNED" % [
 				attacker.unit_id, target.unit_id, dmg])
 	if _show_cutaway:
-		cutaway.queue_event(attacker, target, dmg, result, pre_tgh)
+		cutaway.queue_event(attacker, target, dmg, result, pre_tgh, tier)
 		await cutaway.play_pending()
 	if target.is_downed:
 		var leader_fell := _flush_downed()
@@ -587,8 +625,7 @@ func _do_brace(unit: Unit, sp: WeaponSpecial) -> void:
 	sp.activate()  # sets is_braced + starts cooldown
 	unit.has_attacked = true
 	AudioManager.play_sfx("weapon_impact_wrench")
-	hud.log("%s BRACES — NEXT INCOMING HIT REDUCED BY %d" % [
-		unit.unit_id, CombatConstants.BRACE_DAMAGE_REDUCTION])
+	hud.log("%s BRACES — INCOMING HITS DOWNGRADED ONE TIER" % unit.unit_id)
 
 ## Flush downed units and resolve mission/game-over after an offensive action.
 func _resolve_post_action() -> void:

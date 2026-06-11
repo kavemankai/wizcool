@@ -19,6 +19,7 @@ var _target: Unit = null
 var _dmg: int = 0
 var _result: int = -1
 var _pre_tgh: int = 0
+var _tier: int = GrazeSystem.Tier.CLEAN
 var _event_pending: bool = false
 var _playing: bool = false
 var _anim_tween: Tween = null
@@ -53,12 +54,14 @@ func _ready() -> void:
 # Public API
 # ---------------------------------------------------------------------------
 
-func queue_event(a: Unit, t: Unit, dmg: int, res: int, pre_tgh: int) -> void:
+func queue_event(a: Unit, t: Unit, dmg: int, res: int, pre_tgh: int,
+		tier: int = GrazeSystem.Tier.CLEAN) -> void:
 	_attacker = a
 	_target = t
 	_dmg = dmg
 	_result = res
 	_pre_tgh = pre_tgh
+	_tier = tier
 	_event_pending = true
 
 func has_pending() -> bool:
@@ -156,8 +159,9 @@ func _populate_panels() -> void:
 
 	match _result:
 		Unit.DamageResult.NORMAL:
-			_result_label.text = "HIT  ─%d TOUGHNESS  [ %d / %d ]" % [
-				_dmg, _target.toughness, _target.max_toughness]
+			_result_label.text = "%s  ─%d TOUGHNESS  [ %d / %d ]" % [
+				GrazeSystem.tier_label(_tier), _dmg,
+				_target.toughness, _target.max_toughness]
 		Unit.DamageResult.GEAR_FRACTURED:
 			_result_label.text = "GEAR FRACTURED  ─ TOUGHNESS RESET"
 		Unit.DamageResult.GEAR_BROKEN:

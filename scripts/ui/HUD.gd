@@ -80,6 +80,7 @@ var _cutaway_on: bool = true
 var _debug_on: bool = false
 var _precision_label: Label
 var _aoe_label: Label
+var _preview_label: Label
 var _show_precision_preview: bool = false
 
 # Player crew portraits, keyed by unit_id (ALPHA/BRAVO/CHARLIE). Empty for enemies.
@@ -165,6 +166,14 @@ func _ready() -> void:
 	_aoe_label.add_theme_font_size_override("font_size", FS_INDICATOR)
 	_aoe_label.add_theme_color_override("font_color", HOSTILE)
 	_aoe_label.visible = false
+
+	# Attack preview — graze-tier prediction line, top-centre under the round
+	# counter. Shown on the first tap of the two-tap attack confirm.
+	_preview_label = _label(root, Rect2(SCREEN_W * 0.5 - 320, 62, 640, 26), "",
+			HORIZONTAL_ALIGNMENT_CENTER)
+	_preview_label.add_theme_font_size_override("font_size", FS_INDICATOR)
+	_preview_label.add_theme_color_override("font_color", CAUTION)
+	_preview_label.visible = false
 
 	# --- Bottom-right thumb cluster: primary tactical actions ---------------
 	# Stacked bottom-up: END TURN (anchor), FIELD PATCH, SKIP, USE ABILITY.
@@ -396,6 +405,11 @@ func show_unit(unit: Unit) -> void:
 ## Shows or hides the PRECISION STRIKE indicator near the log area.
 func set_precision_indicator(visible: bool) -> void:
 	_precision_label.visible = visible
+
+## Shows the graze-tier attack prediction line (empty string hides it).
+func set_attack_preview(text: String) -> void:
+	_preview_label.text = text
+	_preview_label.visible = text != ""
 
 ## Shows or hides the AoE target preview near the log area.
 func set_aoe_preview(active: bool, origin_str: String = "") -> void:

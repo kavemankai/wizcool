@@ -11,13 +11,33 @@ static func move_to(unit: Unit, pos: GridPos, grid: GridManager) -> void:
 static func do_attack(attacker: Unit, target: Unit, grid: GridManager = null, cutaway_queue: Object = null) -> int:
 	if attacker.has_attacked or target.is_downed:
 		return -1
-	var dmg := attacker.get_weapon_damage()
+	var tier := GrazeSystem.compute_tier(attacker, target, grid)
+	var dmg := GrazeSystem.apply_tier(attacker.get_weapon_damage(), tier)
 	var pre_tgh := target.toughness
-	var result := CombatResolver.resolve_damage_ex(attacker, target, dmg, false, grid)
+	var result := CombatResolver.resolve_damage_ex(
+			attacker, target, attacker.get_weapon_damage(), false, grid)
 	attacker.has_attacked = true
 	if cutaway_queue != null:
-		cutaway_queue.queue_event(attacker, target, dmg, result, pre_tgh)
+		cutaway_queue.queue_event(attacker, target, dmg, result, pre_tgh, tier)
 	return result
+
+## Pick the best attack target from candidates: highest graze tier first
+## (a CLEAN shot beats a DEFLECTED one), nearest as the tiebreaker.
+## Only considers candidates this unit can attack right now.
+static func pick_best_target(attacker: Unit, candidates: Array[Unit], grid: GridManager) -> Unit:
+	var best: Unit = null
+	var best_tier: int = -1
+	var best_dist: int = 9999
+	for u in candidates:
+		if u.is_downed or not can_attack(attacker, u, grid):
+			continue
+		var tier := GrazeSystem.compute_tier(attacker, u, grid)
+		var d := chebyshev(attacker.grid_pos, u.grid_pos)
+		if tier > best_tier or (tier == best_tier and d < best_dist):
+			best_tier = tier
+			best_dist = d
+			best = u
+	return best
 
 static func best_move_toward(unit: Unit, target_pos: GridPos,
 		all_units: Array[Unit], grid: GridManager,

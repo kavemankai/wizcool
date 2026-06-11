@@ -30,6 +30,16 @@ static func _pursue_and_attack(
 				EnemyAI.move_to(unit, dest, grid)
 				log.append("%s MOVES → [%d,%d]" % [unit.unit_id, dest.x, dest.y])
 
+	# Attack the best-tier target in range — may differ from the pursued unit
+	# when several players are reachable (a CLEAN shot beats a covered one).
+	var players: Array[Unit] = []
+	for u in all_units:
+		if u.is_player:
+			players.append(u)
+	var best_pick := EnemyAI.pick_best_target(unit, players, grid)
+	if best_pick != null:
+		target = best_pick
+
 	if EnemyAI.can_attack(unit, target, grid):
 		var result := EnemyAI.do_attack(unit, target, grid, cutaway_queue)
 		if result >= 0:
