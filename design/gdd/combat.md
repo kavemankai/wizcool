@@ -49,6 +49,39 @@ Effective combat skill: base + sum(gear.get_effective_modifier() where stat_targ
 Effective speed: base + sum(gear.get_effective_modifier() where stat_target == "speed")
 ```
 
+### Graze tier ladder (deterministic — no dice; pillar preserved)
+
+Every attack lands; board conditions set its *quality*. Implemented in
+`GrazeSystem.compute_tier()` / `apply_tier()`; constants in `CombatConstants`.
+
+```
+tier starts at CLEAN, modifiers apply, clamp to [CHIP .. CLEAN]:
+  HEAVY cover, not flanked   → −2        LIGHT cover, not flanked  → −1
+  target BRACEd              → −1        attack at max range band  → −1
+                                         (only for attack_range > 1)
+  adjacent (distance 1)      → +1
+
+target gear erodes their cover discipline:
+  weapon BROKEN     → cover penalty ignored entirely
+  weapon FRACTURED  → cover penalty reduced by 1 (HEAVY acts as LIGHT)
+
+damage transform:
+  CLEAN  = full weapon damage           (e.g. 3 → 3)
+  GRAZE  = max(1, damage − 1)           (e.g. 3 → 2, 1 → 1)
+  CHIP   = 1 ("DEFLECTED")              (e.g. 3 → 1)
+
+CORRODED (+1 incoming) applies AFTER the tier transform.
+Precision Strike (flank + intact weapon + target not in heavy cover)
+  = forced CLEAN + 1 bonus damage.
+```
+
+Example: PLASMA-CUTTER (3 dmg) vs target in LIGHT cover, not flanked,
+mid-range → GRAZE → 2 damage. Same shot from a flank → CLEAN → 3 damage.
+
+Pre-attack preview: first tap on a target shows the predicted tier and damage
+(`HUD.set_attack_preview`); second tap commits. The preview and the resolution
+call the same pure function, so they can never disagree.
+
 ## Edge Cases
 
 - Unit with 0 gear: DOWNED immediately on first hit reaching 0 TGH
@@ -72,6 +105,12 @@ Effective speed: base + sum(gear.get_effective_modifier() where stat_target == "
 - Weapon damage set per-unit in Main.gd `_spawn_units()`
 - Enemy phase delay: `0.8` seconds (skippable)
 - Cutaway auto-dismiss: `2.0` seconds
+- Graze ladder (CombatConstants): `TIER_PENALTY_LIGHT_COVER=1`,
+  `TIER_PENALTY_HEAVY_COVER=2`, `TIER_PENALTY_BRACE=1`,
+  `TIER_PENALTY_MAX_RANGE=1`, `TIER_BONUS_ADJACENT=1`,
+  `GRAZE_DAMAGE_REDUCTION=1`, `CHIP_DAMAGE=1`
+  (safe ranges: penalties 1–2; reductions 1; raising CHIP_DAMAGE above 1
+  collapses the value of cover — don't)
 
 ## Acceptance Criteria
 

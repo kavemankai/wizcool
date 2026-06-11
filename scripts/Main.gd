@@ -21,8 +21,11 @@ var dropped_loot: Array[GearItem] = []
 var rival_rank: int = 1
 var hazard_manager: HazardSystem = null
 var _skip_requested: bool = false
-var _show_cutaway: bool = true
 var _debug_mode: bool = false
+
+# Two-tap attack confirm: first tap on an enemy previews the graze tier,
+# second tap on the same enemy commits. Cleared on any other interaction.
+var _pending_target: Unit = null
 
 # Vanguard reinforcement timing. A mission may defer the Vanguard so they
 # arrive mid-mission instead of at the start. vanguard_spawn_turn <= 1 means
@@ -38,7 +41,14 @@ var _gear_archive: Dictionary = {}
 @onready var hud: HUD = $HUD
 @onready var cutaway: CombatCutaway = $CombatCutaway
 
+var pause_menu: PauseMenu
+
 func _ready() -> void:
+	pause_menu = PauseMenu.new()
+	add_child(pause_menu)
+	pause_menu.resume_pressed.connect(func() -> void: _set_paused(false))
+	pause_menu.abandon_pressed.connect(_on_pause_abandon)
+	hud.pause_pressed.connect(func() -> void: _set_paused(true))
 	var grid_w := GridManager.GRID_WIDTH * GridManager.TILE_SIZE
 	var grid_h := GridManager.GRID_HEIGHT * GridManager.TILE_SIZE
 	var vp := get_viewport_rect().size
@@ -50,7 +60,6 @@ func _ready() -> void:
 	hud.field_patch_pressed.connect(_on_field_patch)
 	hud.skip_pressed.connect(func() -> void: _skip_requested = true)
 	hud.ability_pressed.connect(_on_ability_pressed)
-	hud.cutaway_toggled.connect(func(on: bool) -> void: _show_cutaway = on)
 	hud.debug_toggled.connect(func(on: bool) -> void: _debug_mode = on)
 
 	var gs := GameState
@@ -263,6 +272,20 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_handle_click(event.global_position)
 
+## Android back button → pause menu toggle (ignored once the mission ends).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST and game_phase != GamePhase.GAME_OVER:
+		_set_paused(not get_tree().paused)
+
+func _set_paused(paused: bool) -> void:
+	get_tree().paused = paused
+	pause_menu.visible = paused
+
+func _on_pause_abandon() -> void:
+	_set_paused(false)
+	hud.log("=== MISSION ABANDONED ===")
+	_on_mission_fail("MISSION ABANDONED")
+
 func _handle_click(click_pos: Vector2) -> void:
 	var clicked_unit: Unit = _unit_at_screen(click_pos)
 	var clicked_grid: GridPos = grid_manager.world_to_grid(click_pos)
@@ -284,16 +307,24 @@ func _handle_click(click_pos: Vector2) -> void:
 				_select(clicked_unit)
 			elif clicked_unit != null and not clicked_unit.is_player and not clicked_unit.is_downed:
 				if not active_unit.has_attacked and _can_attack(active_unit, clicked_unit):
-					await _do_attack(active_unit, clicked_unit)
-					if game_phase == GamePhase.GAME_OVER:
-						_enter_idle()
-						return
-					_refresh_highlights()
-					if not active_unit.can_act():
-						_enter_idle()
+					# Two-tap confirm: first tap previews the graze tier,
+					# second tap on the same target commits the attack.
+					if clicked_unit == _pending_target:
+						_clear_attack_preview()
+						await _do_attack(active_unit, clicked_unit)
+						if game_phase == GamePhase.GAME_OVER:
+							_enter_idle()
+							return
+						_refresh_highlights()
+						if not active_unit.can_act():
+							_enter_idle()
+					else:
+						_show_attack_preview(active_unit, clicked_unit)
 				else:
+					_clear_attack_preview()
 					hud.log("OUT OF RANGE")
 			elif not active_unit.has_moved and _is_move_tile(clicked_grid):
+				_clear_attack_preview()
 				_do_move(active_unit, clicked_grid)
 				if game_phase == GamePhase.GAME_OVER:
 					_enter_idle()
@@ -328,6 +359,7 @@ func _handle_click(click_pos: Vector2) -> void:
 func _select(unit: Unit) -> void:
 	if active_unit and active_unit != unit:
 		active_unit.deselect()
+	_clear_attack_preview()
 	active_unit = unit
 	unit.select()
 	_refresh_highlights()
@@ -335,9 +367,31 @@ func _select(unit: Unit) -> void:
 	hud.set_field_patch_visible(_can_field_patch(unit))
 	input_state = InputState.ACTING
 
+## First tap on a target: show the predicted graze tier before committing.
+func _show_attack_preview(attacker: Unit, target: Unit) -> void:
+	_pending_target = target
+	var is_precision := PrecisionStrike.can_use(attacker, target)
+	var tier: int
+	var dmg: int
+	if is_precision:
+		tier = GrazeSystem.Tier.CLEAN
+		dmg = PrecisionStrike.get_damage(attacker)
+	else:
+		tier = GrazeSystem.compute_tier(attacker, target, grid_manager)
+		dmg = GrazeSystem.apply_tier(attacker.get_weapon_damage(), tier)
+	var reason := "PRECISION" if is_precision \
+			else GrazeSystem.tier_reason(attacker, target, grid_manager)
+	hud.set_attack_preview("%s → %s  −%d  [%s]  · TAP AGAIN TO FIRE" % [
+			target.unit_id, GrazeSystem.tier_label(tier), dmg, reason])
+
+func _clear_attack_preview() -> void:
+	_pending_target = null
+	hud.set_attack_preview("")
+
 func _enter_idle() -> void:
 	if active_unit:
 		active_unit.deselect()
+	_clear_attack_preview()
 	active_unit = null
 	move_tiles = []
 	grid_manager.clear_all_highlights()
@@ -435,6 +489,7 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 	var pre_tgh := target.toughness
 	var dmg: int
 	var result: int
+	var tier: int = GrazeSystem.Tier.CLEAN
 	if _debug_mode and not target.is_player:
 		dmg = target.max_toughness
 		target.toughness = 0
@@ -449,8 +504,9 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 			CombatResolver.apply_status(target, StatusEffect.Type.SUPPRESSED)
 			hud.set_precision_indicator(false)
 		else:
-			dmg = attacker.get_weapon_damage()
-			result = CombatResolver.resolve_damage_ex(attacker, target, dmg, false, grid_manager)
+			tier = GrazeSystem.compute_tier(attacker, target, grid_manager)
+			dmg = GrazeSystem.apply_tier(attacker.get_weapon_damage(), tier)
+			result = CombatResolver.resolve_damage_ex(attacker, target, attacker.get_weapon_damage(), false, grid_manager)
 		# Chip cover integrity on each hit
 		if target.cover_integrity > 0:
 			target.cover_integrity -= 1
@@ -458,16 +514,17 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 				grid_manager.damage_cover_at(target.grid_pos)
 				target.cover_type = CoverSystem.CoverType.NONE
 	attacker.has_attacked = true
+	var tier_tag := GrazeSystem.tier_label(tier)
 	match result:
 		Unit.DamageResult.NORMAL:
-			hud.log("%s → %s  -%d TGH  [%d/%d]" % [
-				attacker.unit_id, target.unit_id, dmg,
+			hud.log("%s → %s  %s  -%d TGH  [%d/%d]" % [
+				attacker.unit_id, target.unit_id, tier_tag, dmg,
 				target.toughness, target.max_toughness])
 		Unit.DamageResult.GEAR_FRACTURED:
 			var item := _find_gear_by_state(target, GearItem.GearState.FRACTURED)
 			var slot_name := item.slot.to_upper() if item else "GEAR"
-			hud.log("%s → %s  %s FRACTURED — TGH RESET" % [
-				attacker.unit_id, target.unit_id, slot_name])
+			hud.log("%s → %s  %s  %s FRACTURED — TGH RESET" % [
+				attacker.unit_id, target.unit_id, tier_tag, slot_name])
 		Unit.DamageResult.GEAR_BROKEN:
 			var item := _find_gear_by_state(target, GearItem.GearState.BROKEN)
 			var slot_name := item.slot.to_upper() if item else "GEAR"
@@ -476,9 +533,12 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 		Unit.DamageResult.DOWNED:
 			hud.log("%s → %s  -%d TGH — DOWNED" % [
 				attacker.unit_id, target.unit_id, dmg])
-	if _show_cutaway:
-		cutaway.queue_event(attacker, target, dmg, result, pre_tgh)
+	if GameState.show_cutaway:
+		cutaway.queue_event(attacker, target, dmg, result, pre_tgh, tier)
 		await cutaway.play_pending()
+	else:
+		AudioManager.play_weapon(attacker)
+		AudioManager.play_result(result)
 	if target.is_downed:
 		var leader_fell := _flush_downed()
 		if leader_fell:
@@ -587,8 +647,7 @@ func _do_brace(unit: Unit, sp: WeaponSpecial) -> void:
 	sp.activate()  # sets is_braced + starts cooldown
 	unit.has_attacked = true
 	AudioManager.play_sfx("weapon_impact_wrench")
-	hud.log("%s BRACES — NEXT INCOMING HIT REDUCED BY %d" % [
-		unit.unit_id, CombatConstants.BRACE_DAMAGE_REDUCTION])
+	hud.log("%s BRACES — INCOMING HITS DOWNGRADED ONE TIER" % unit.unit_id)
 
 ## Flush downed units and resolve mission/game-over after an offensive action.
 func _resolve_post_action() -> void:
@@ -645,6 +704,7 @@ func _on_field_patch() -> void:
 	active_unit.gear.remove_at(kit_index)
 	active_unit.has_attacked = true
 	active_unit.queue_redraw()
+	AudioManager.play_sfx("field_patch")
 	hud.log("%s FIELD-PATCHES %s [MODIFIER PARTIALLY RESTORED]" % [
 		active_unit.unit_id, target_item.item_id])
 	_refresh_highlights()
@@ -682,7 +742,7 @@ func _run_enemy_phase() -> void:
 		if not is_instance_valid(enemy) or enemy.is_downed:
 			continue
 
-		await get_tree().create_timer(0.0 if _skip_requested else 0.8).timeout
+		await get_tree().create_timer(0.0 if _skip_requested else 0.8, false).timeout
 
 		if game_phase == GamePhase.GAME_OVER:
 			break
@@ -694,7 +754,7 @@ func _run_enemy_phase() -> void:
 		enemy.queue_redraw()
 		hud.show_unit(enemy)
 
-		var cq: Object = null if (_skip_requested or not _show_cutaway) else cutaway
+		var cq: Object = null if (_skip_requested or not GameState.show_cutaway) else cutaway
 		var lines: Array[String] = []
 		match enemy.archetype:
 			Unit.Archetype.GUARDIAN:
@@ -706,11 +766,14 @@ func _run_enemy_phase() -> void:
 		for line in lines:
 			hud.log(line)
 
+		if enemy.has_attacked and not GameState.show_cutaway and not _skip_requested:
+			AudioManager.play_weapon(enemy)
+
 		if is_instance_valid(enemy):
 			enemy.is_acting = false
 			enemy.queue_redraw()
 
-		if not _skip_requested and _show_cutaway and cutaway.has_pending():
+		if not _skip_requested and GameState.show_cutaway and cutaway.has_pending():
 			await cutaway.play_pending()
 		elif cutaway.has_pending():
 			cutaway.clear_pending()
@@ -760,7 +823,7 @@ func _run_enemy_phase() -> void:
 		if game_phase == GamePhase.GAME_OVER:
 			return
 
-	await get_tree().create_timer(0.0 if skip_was_requested else 0.4).timeout
+	await get_tree().create_timer(0.0 if skip_was_requested else 0.4, false).timeout
 
 	round_number += 1
 
@@ -892,7 +955,7 @@ func _on_mission_success() -> void:
 		"campaign_complete": campaign_complete,
 	}
 	sm.save()
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(1.5, false).timeout
 	get_tree().change_scene_to_file("res://scenes/ui/PostMissionScreen.tscn")
 
 func _on_mission_fail(reason: String) -> void:
@@ -913,7 +976,7 @@ func _on_mission_fail(reason: String) -> void:
 		"campaign_complete": false,
 	}
 	sm.save()
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(1.5, false).timeout
 	get_tree().change_scene_to_file("res://scenes/ui/PostMissionScreen.tscn")
 
 # ---------------------------------------------------------------------------

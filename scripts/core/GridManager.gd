@@ -29,6 +29,8 @@ var _extract_overlay: ExtractionPulse = null
 
 func _ready() -> void:
 	_init_tiles()
+	# Crisp 2:1 downsample for the sprite skin (64px tile art into 32px cells).
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	# Pulsing extraction marker lives in its own canvas item so the static
 	# board is not redrawn every frame just to animate one tile.
 	_extract_overlay = ExtractionPulse.new()
@@ -196,7 +198,11 @@ func _draw() -> void:
 	for x in GRID_WIDTH:
 		for y in GRID_HEIGHT:
 			var rect := Rect2(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-			draw_rect(rect, TILE_COLORS[tiles[x][y]])
+			var tex := SpriteLib.tile_texture(tiles[x][y], x, y)
+			if tex != null:
+				draw_texture_rect(tex, rect, false)
+			else:
+				draw_rect(rect, TILE_COLORS[tiles[x][y]])
 			draw_rect(rect, LINE_COLOR, false, 0.5)
 
 	for pos in _move_highlights:

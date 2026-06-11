@@ -2,10 +2,10 @@ class_name HUD
 extends CanvasLayer
 
 signal end_turn_pressed
+signal pause_pressed
 signal field_patch_pressed
 signal skip_pressed
 signal ability_pressed
-signal cutaway_toggled(enabled: bool)
 signal debug_toggled(enabled: bool)
 
 # Fewer, larger log lines so the combat log stays readable on a phone.
@@ -74,12 +74,11 @@ var _end_turn_btn: Button
 var _field_patch_btn: Button
 var _skip_btn: Button
 var _ability_btn: Button
-var _cutaway_btn: Button
 var _debug_btn: Button
-var _cutaway_on: bool = true
 var _debug_on: bool = false
 var _precision_label: Label
 var _aoe_label: Label
+var _preview_label: Label
 var _show_precision_preview: bool = false
 
 # Player crew portraits, keyed by unit_id (ALPHA/BRAVO/CHARLIE). Empty for enemies.
@@ -115,7 +114,7 @@ func _ready() -> void:
 	var inspect_rect := Rect2(SCREEN_W - MARGIN - 240, 96, 240, 250)
 	var inspect_panel := _panel(root, inspect_rect)
 	# Crew portrait — top-centre of the panel, shown only for player units that
-	# have one. Linear filter: these are painterly photo portraits, not pixel art.
+	# have one. Linear filter: downscaled pixel-art illustrations read fine soft.
 	_unit_portrait = TextureRect.new()
 	_unit_portrait.set_position(Vector2(78, 6))
 	_unit_portrait.set_size(Vector2(84, 84))
@@ -129,9 +128,21 @@ func _ready() -> void:
 	_unit_label.add_theme_font_size_override("font_size", FS_UNIT)
 	_unit_label.add_theme_color_override("font_color", PARCHMENT)
 
-	# Preload crew portraits if they've been imported.
-	for pid: String in ["ALPHA", "BRAVO", "CHARLIE"]:
-		var ppath := "res://assets/portraits/portrait_player_%s.png" % pid.to_lower()
+	# Preload portraits if imported. Player crew + named Vanguard rival crew key
+	# by exact unit_id; SENTINEL/PRISONER are archetype types so any unit whose
+	# id starts with that name resolves to the shared face (see _portrait_key).
+	var portrait_paths := {
+		"ALPHA": "res://assets/portraits/portrait_player_alpha.png",
+		"BRAVO": "res://assets/portraits/portrait_player_bravo.png",
+		"CHARLIE": "res://assets/portraits/portrait_player_charlie.png",
+		"VANGUARD-1": "res://assets/portraits/portrait_enemy_vanguard_leader.png",
+		"VANGUARD-2": "res://assets/portraits/portrait_enemy_vanguard_soldier.png",
+		"VANGUARD-3": "res://assets/portraits/portrait_enemy_vanguard_tech.png",
+		"SENTINEL": "res://assets/portraits/portrait_enemy_sentinel.png",
+		"PRISONER": "res://assets/portraits/portrait_enemy_prisoner.png",
+	}
+	for pid: String in portrait_paths:
+		var ppath: String = portrait_paths[pid]
 		if ResourceLoader.exists(ppath):
 			_portraits[pid] = load(ppath)
 
@@ -153,6 +164,14 @@ func _ready() -> void:
 	_aoe_label.add_theme_font_size_override("font_size", FS_INDICATOR)
 	_aoe_label.add_theme_color_override("font_color", HOSTILE)
 	_aoe_label.visible = false
+
+	# Attack preview — graze-tier prediction line, top-centre under the round
+	# counter. Shown on the first tap of the two-tap attack confirm.
+	_preview_label = _label(root, Rect2(SCREEN_W * 0.5 - 320, 62, 640, 26), "",
+			HORIZONTAL_ALIGNMENT_CENTER)
+	_preview_label.add_theme_font_size_override("font_size", FS_INDICATOR)
+	_preview_label.add_theme_color_override("font_color", CAUTION)
+	_preview_label.visible = false
 
 	# --- Bottom-right thumb cluster: primary tactical actions ---------------
 	# Stacked bottom-up: END TURN (anchor), FIELD PATCH, SKIP, USE ABILITY.
@@ -200,16 +219,19 @@ func _ready() -> void:
 		ability_pressed.emit())
 	root.add_child(_ability_btn)
 
+	# --- Top-left: PAUSE (under the mission title, away from grid taps) -----
+	var pause_btn := _settings_button(root, Rect2(MARGIN, 44, 150, 56), "❚❚ PAUSE")
+	pause_btn.add_theme_font_size_override("font_size", 20)
+	pause_btn.pressed.connect(func() -> void:
+		AudioManager.play_sfx("ui_click")
+		pause_pressed.emit())
+
 	# --- Top-right corner: secondary settings (small, out of thumb zone) ----
 	# CUTAWAY and DEBUG are settings, not per-turn actions, so they sit small
 	# in the corner and never compete with END TURN / USE ABILITY.
 	var set_x := SCREEN_W - MARGIN - SET_BTN_W
-	_cutaway_btn = _settings_button(root, Rect2(set_x, MARGIN, SET_BTN_W, SET_BTN_H),
-			"CUTAWAY: ON")
-	_cutaway_btn.pressed.connect(_on_cutaway_btn_pressed)
-
-	_debug_btn = _settings_button(root,
-			Rect2(set_x, MARGIN + SET_BTN_H + 8, SET_BTN_W, SET_BTN_H), "DEBUG: OFF")
+	_debug_btn = _settings_button(root, Rect2(set_x, MARGIN, SET_BTN_W, SET_BTN_H),
+			"DEBUG: OFF")
 	_debug_btn.visible = GameState.DEBUG_MODE
 	_debug_btn.pressed.connect(_on_debug_btn_pressed)
 
@@ -307,16 +329,23 @@ func set_field_patch_visible(show_btn: bool) -> void:
 func set_skip_visible(show_btn: bool) -> void:
 	_skip_btn.visible = show_btn
 
+## Resolve a unit_id to a loaded portrait key, or "" if none.
+## Exact match for named crew; prefix match for archetype types (SENTINEL-1,
+## PRISONER-2, … all share one face).
+func _portrait_key(unit_id: String) -> String:
+	if _portraits.has(unit_id):
+		return unit_id
+	if unit_id.begins_with("SENTINEL") and _portraits.has("SENTINEL"):
+		return "SENTINEL"
+	if unit_id.begins_with("PRISONER") and _portraits.has("PRISONER"):
+		return "PRISONER"
+	return ""
+
 ## Show/hide the USE ABILITY button and set its label to the ability name.
 func set_ability_visible(show_btn: bool, label: String = "") -> void:
 	_ability_btn.visible = show_btn
 	if show_btn and label != "":
 		_ability_btn.text = label
-
-func _on_cutaway_btn_pressed() -> void:
-	_cutaway_on = not _cutaway_on
-	_cutaway_btn.text = "CUTAWAY: ON" if _cutaway_on else "CUTAWAY: OFF"
-	cutaway_toggled.emit(_cutaway_on)
 
 func _on_debug_btn_pressed() -> void:
 	_debug_on = not _debug_on
@@ -330,9 +359,10 @@ func show_unit(unit: Unit) -> void:
 		_unit_label.position = Vector2(10, 8)
 		_unit_label.size = Vector2(220, 234)
 		return
-	# Crew portrait: show it and drop the stat text below; otherwise full panel.
-	if unit.is_player and _portraits.has(unit.unit_id):
-		_unit_portrait.texture = _portraits[unit.unit_id]
+	# Portrait: show it and drop the stat text below; otherwise full panel.
+	var pkey := _portrait_key(unit.unit_id)
+	if pkey != "":
+		_unit_portrait.texture = _portraits[pkey]
 		_unit_portrait.visible = true
 		_unit_label.position = Vector2(10, 96)
 		_unit_label.size = Vector2(220, 146)
@@ -371,6 +401,11 @@ func show_unit(unit: Unit) -> void:
 ## Shows or hides the PRECISION STRIKE indicator near the log area.
 func set_precision_indicator(visible: bool) -> void:
 	_precision_label.visible = visible
+
+## Shows the graze-tier attack prediction line (empty string hides it).
+func set_attack_preview(text: String) -> void:
+	_preview_label.text = text
+	_preview_label.visible = text != ""
 
 ## Shows or hides the AoE target preview near the log area.
 func set_aoe_preview(active: bool, origin_str: String = "") -> void:

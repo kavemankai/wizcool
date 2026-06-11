@@ -19,6 +19,7 @@ var _target: Unit = null
 var _dmg: int = 0
 var _result: int = -1
 var _pre_tgh: int = 0
+var _tier: int = GrazeSystem.Tier.CLEAN
 var _event_pending: bool = false
 var _playing: bool = false
 var _anim_tween: Tween = null
@@ -53,12 +54,14 @@ func _ready() -> void:
 # Public API
 # ---------------------------------------------------------------------------
 
-func queue_event(a: Unit, t: Unit, dmg: int, res: int, pre_tgh: int) -> void:
+func queue_event(a: Unit, t: Unit, dmg: int, res: int, pre_tgh: int,
+		tier: int = GrazeSystem.Tier.CLEAN) -> void:
 	_attacker = a
 	_target = t
 	_dmg = dmg
 	_result = res
 	_pre_tgh = pre_tgh
+	_tier = tier
 	_event_pending = true
 
 func has_pending() -> bool:
@@ -83,11 +86,11 @@ func play_pending() -> void:
 	if not _playing:
 		return
 	_play_attack_animation()
-	await get_tree().create_timer(0.85).timeout
+	await get_tree().create_timer(0.85, false).timeout
 	if not _playing:
 		return
 	_update_tgh_label()
-	get_tree().create_timer(2.0).timeout.connect(_finish, CONNECT_ONE_SHOT)
+	get_tree().create_timer(2.0, false).timeout.connect(_finish, CONNECT_ONE_SHOT)
 	await cutaway_dismissed
 
 # ---------------------------------------------------------------------------
@@ -105,6 +108,7 @@ func _finish() -> void:
 	if not _playing:
 		return
 	_playing = false
+	AudioManager.play_sfx("cutaway_dismiss")
 	if is_instance_valid(_anim_tween):
 		_anim_tween.kill()
 	if is_instance_valid(_fade_tween):
@@ -156,8 +160,9 @@ func _populate_panels() -> void:
 
 	match _result:
 		Unit.DamageResult.NORMAL:
-			_result_label.text = "HIT  ─%d TOUGHNESS  [ %d / %d ]" % [
-				_dmg, _target.toughness, _target.max_toughness]
+			_result_label.text = "%s  ─%d TOUGHNESS  [ %d / %d ]" % [
+				GrazeSystem.tier_label(_tier), _dmg,
+				_target.toughness, _target.max_toughness]
 		Unit.DamageResult.GEAR_FRACTURED:
 			_result_label.text = "GEAR FRACTURED  ─ TOUGHNESS RESET"
 		Unit.DamageResult.GEAR_BROKEN:
@@ -174,6 +179,7 @@ func _populate_panels() -> void:
 func _update_tgh_label() -> void:
 	if not is_instance_valid(_target):
 		return
+	AudioManager.play_result(_result)
 	match _result:
 		Unit.DamageResult.GEAR_FRACTURED:
 			_def_tgh_label.text = "TOUGHNESS  %d / %d  [RESET]" % [
@@ -229,6 +235,7 @@ func _reset_sprite_positions() -> void:
 func _play_attack_animation() -> void:
 	if not is_instance_valid(_attacker) or not is_instance_valid(_target):
 		return
+	AudioManager.play_weapon(_attacker)
 
 	if is_instance_valid(_anim_tween):
 		_anim_tween.kill()
@@ -320,9 +327,10 @@ func _build_ui() -> void:
 	ovr.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(ovr)
 
-	# Panel backgrounds (tall — cover text zone + sprite zone)
-	_bg_rect(root, Vector2(60, 55), Vector2(510, 600))
-	_bg_rect(root, Vector2(710, 55), Vector2(510, 600))
+	# Panel backgrounds (tall — cover text zone + sprite zone). Painted
+	# side-backgrounds when the art exists; flat panels otherwise.
+	_panel_bg(root, Vector2(60, 55), Vector2(510, 600), true)
+	_panel_bg(root, Vector2(710, 55), Vector2(510, 600), false)
 
 	# === TEXT ZONE (top ~200px of each panel) ===
 
@@ -413,3 +421,18 @@ func _bg_rect(parent: Control, pos: Vector2, sz: Vector2,
 	r.color = col
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(r)
+
+## Side panel background: painted scene art when present, flat panel otherwise.
+func _panel_bg(parent: Control, pos: Vector2, sz: Vector2, player_side: bool) -> void:
+	var tex := SpriteLib.cutaway_bg(player_side)
+	if tex == null:
+		_bg_rect(parent, pos, sz)
+		return
+	var tr := TextureRect.new()
+	tr.position = pos
+	tr.size = sz
+	tr.texture = tex
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(tr)

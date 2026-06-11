@@ -123,18 +123,13 @@ static func _find_leader(all_units: Array[Unit]) -> Unit:
 			return u
 	return null
 
+## Best attackable player: highest graze tier (CLEAN preferred), nearest tiebreak.
 static func _nearest_player_in_range(unit: Unit, all_units: Array[Unit], grid: GridManager) -> Unit:
-	var nearest: Unit = null
-	var best := 9999
+	var players: Array[Unit] = []
 	for u in all_units:
-		if not u.is_player or u.is_downed:
-			continue
-		if EnemyAI.can_attack(unit, u, grid):
-			var d := EnemyAI.chebyshev(unit.grid_pos, u.grid_pos)
-			if d < best:
-				best = d
-				nearest = u
-	return nearest
+		if u.is_player:
+			players.append(u)
+	return EnemyAI.pick_best_target(unit, players, grid)
 
 static func _attack_suffix(result: int) -> String:
 	if result == Unit.DamageResult.GEAR_FRACTURED:

@@ -14,3 +14,10 @@ var pending_loot: Array[GearItem] = []
 var current_campaign_id: String = "containment-breach"
 var current_mission_index: int = 0
 var campaigns_completed: int = 0
+
+# Player settings (persisted separately via SaveManager settings ConfigFile).
+# Volumes are linear 0..1; music defaults quiet (~ -12 dB).
+var sfx_volume: float = 1.0
+var music_volume: float = 0.25
+var ui_volume: float = 1.0
+var show_cutaway: bool = true

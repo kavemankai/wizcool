@@ -3,7 +3,13 @@
 > **Source**: design/assets/entity-inventory.md, design/art/art-bible.md
 > **Art Bible**: design/art/art-bible.md
 > **Generated**: 2026-06-08
-> **Status**: 6 assets specced / 6 approved / 0 in production / 0 done
+> **Status**: 8 assets specced / 8 approved / 6 placeholder-delivered / 2 needed
+>
+> **Roster:** Player crew ALPHA/BRAVO/CHARLIE (ASSET-001/002/003) and the named
+> Vanguard rival crew leader/soldier/tech (ASSET-006/035/036) are recurring
+> *individuals* — placeholder portraits delivered and wired into the HUD inspect
+> panel. SENTINEL and PRISONER (ASSET-004/005) are faceless archetype *types*
+> (one face per type, many units) and are not yet produced.
 
 ---
 
@@ -168,7 +174,21 @@ Industrial hard science fiction character portrait, mug shot institutional docum
 
 ---
 
-## ASSET-006 — portrait_enemy_vanguard.png
+## VANGUARD — Named Rival Crew (ASSET-006 / 035 / 036)
+
+> **The Vanguard are a recurring named rival crew that mirrors the player crew
+> — three distinct individuals, not faceless mooks.** They map to the spawn
+> code's `VANGUARD-1/2/3` units (and their per-slot gear): VANGUARD-1 = leader,
+> VANGUARD-2 = soldier (carries the BALLISTIC-PLATE), VANGUARD-3 = tech (carries
+> the medkit). Like the player crew, generate all three in **one session sharing
+> a register** — but a *different* register from the player crew: cleaner
+> **corporate personnel lighting** + **MANDATE brown**, because the Vanguard are
+> the well-resourced rival company. Same-crew glue, three distinct people/roles.
+> HUD maps `unit_id` → portrait, so the filenames are role-based, not numeric.
+
+---
+
+## ASSET-006 — portrait_enemy_vanguard_leader.png (VANGUARD-1, leader)
 
 | Field | Value |
 |---|---|
@@ -177,33 +197,94 @@ Industrial hard science fiction character portrait, mug shot institutional docum
 | Format | PNG, 32-bit RGBA, straight alpha |
 | Color profile | sRGB, no embedded ICC profile |
 | File size | ≤60 KB (typical 8–20 KB lossless) |
-| Naming | `portrait_enemy_vanguard.png` |
-| Resource path | `res://assets/portraits/portrait_enemy_vanguard.png` |
+| Naming | `portrait_enemy_vanguard_leader.png` |
+| Resource path | `res://assets/portraits/portrait_enemy_vanguard_leader.png` |
+| Maps to unit | `VANGUARD-1` |
 | Import preset | Standard Portrait Preset |
-| TextureRect | `stretch_mode = STRETCH_KEEP_CENTERED`, `texture_filter = TEXTURE_FILTER_NEAREST` |
-| LOD | None — fixed UI element, locked 1280×720 viewport |
+| TextureRect | HUD inspect panel, `STRETCH_KEEP_ASPECT_CENTERED`, `TEXTURE_FILTER_LINEAR` |
 
 **Visual Description:**
-A professional headshot — not a capture, a sitting. The subject chose the angle (deliberate three-quarter) and the subject chose the light (single soft key from upper-right, nothing harsh). A person in their fifties with the kind of face that has made calculations in front of other people's faces for a long time, and knows it. The gear reads institutional authority: MANDATE brown at the collar, worn but maintained — the difference between degradation through use and degradation through neglect. Background is deep charcoal VOID, no facility markers visible.
+The crew's commander — mid-fifties, calculating and patient, the face of someone who plans several moves ahead. A corporate personnel headshot: clean controlled lighting, MANDATE-brown senior authority gear, maintained not neglected. Deep charcoal VOID background. Reads as control and choice, not aggression.
 
 **Art Bible Anchors:**
-- §1 Visual Identity: VANGUARD's portrait is the one asset where deliberateness of composition is itself the message — the antagonist has resources and agency the player does not
-- §3 Shape Language: named antagonist exception to enemy mug-shot rule — professional headshot, deliberate angle, controlled light contrast the PRISONER and SENTINEL captures
-- §5 Colour Coding: VANGUARD uses MANDATE inverted triangle; MANDATE brown (#8B5E3C) governs the portrait register, encoding worn institutional authority
-- §9 Reference Direction: Brecht Evens (single colour register defining social space); Alien Weyland-Yutani (systems that predate and outlast the individual)
+- §1 Visual Identity: the Vanguard have resources and agency the player crew does not — their cleaner corporate register encodes that
+- §3 Shape Language: rival crew shares one register (like the player crew) but each member is a distinct individual/role
+- §5 Colour Coding: MANDATE brown (#8B5E3C) governs the whole Vanguard crew register
 
 **Generation Prompt:**
-Industrial hard science fiction character portrait, professional headshot aesthetic — deliberate sitting not a capture, chest-up crop, deliberate three-quarter angle, single soft key light from upper-right, controlled even shadow on opposite side of face, deep charcoal void background no facility markers (#0A0A0C void to #1E1E24 seam gradient), subject: person mid-fifties, calculating controlled expression, intelligent and patient — someone who plans several moves ahead, institutional authority gear in MANDATE bureaucratic brown (#8B5E3C) worn collar and lapel maintained not neglected, MANDATE register dominant throughout portrait, named antagonist reads through deliberateness of composition and expression not through aggression, cassette-futurism Alien Weyland-Yutani institutional authority aesthetic, Brecht Evens single colour register defining social power, photorealistic matte oil-painting texture, single light source discipline, no fill light, no rim
+Industrial hard science fiction character portrait, corporate security personnel file headshot, chest-up crop, deliberate three-quarter angle, clean even corporate lighting slightly cool and well-resourced, deep charcoal void background no facility markers (#0A0A0C void to #1E1E24 seam gradient), subject: person mid-fifties, calculating controlled expression, intelligent and patient — plans several moves ahead, senior institutional authority gear in MANDATE bureaucratic brown (#8B5E3C) with maintained collar and lapel, the crew's commander, MANDATE register dominant, reads as control and choice not aggression, cassette-futurism Alien Weyland-Yutani corporate authority aesthetic, photorealistic matte oil-painting texture, even corporate light discipline, no rim, no glamour
 
-`--no` mug shot framing, aggressive expression, bright colours, purple, teal, blue, parchment warmth dominant, fieldgrey dominant, caution amber, fluorescent flat lighting, motion blur, off-axis capture framing, fantasy, supernatural, glowing elements, medals, ornaments, heroic pose, dynamic angle, full body, youth, beauty lighting, lens flare, bokeh
+`--no` mug shot framing, aggressive expression, motion blur, bright colours, purple, teal, blue, parchment warmth dominant, fieldgrey dominant, caution amber, fantasy, supernatural, glowing elements, medals, heroic rim-lit hero shot, dynamic angle, full body, beauty lighting, lens flare, bokeh
 
-**Status:** Needed
+**Status:** Placeholder delivered (wired to HUD)
+
+---
+
+## ASSET-035 — portrait_enemy_vanguard_soldier.png (VANGUARD-2, soldier)
+
+| Field | Value |
+|---|---|
+| Category | Portrait |
+| Dimensions | 96×96px |
+| Format | PNG, 32-bit RGBA, straight alpha |
+| Color profile | sRGB, no embedded ICC profile |
+| File size | ≤60 KB (typical 8–20 KB lossless) |
+| Naming | `portrait_enemy_vanguard_soldier.png` |
+| Resource path | `res://assets/portraits/portrait_enemy_vanguard_soldier.png` |
+| Maps to unit | `VANGUARD-2` (carries BALLISTIC-PLATE) |
+| Import preset | Standard Portrait Preset |
+| TextureRect | HUD inspect panel, `STRETCH_KEEP_ASPECT_CENTERED`, `TEXTURE_FILTER_LINEAR` |
+
+**Visual Description:**
+The crew's muscle — a mid-twenties super-soldier, physically imposing (tall, heavy-shouldered, thick neck, square clean-cut jaw — Jack Reacher / John Cena physicality), short regulation haircut, calm neutral controlled expression. Heavy corporate combat gear with a visible ballistic plate, MANDATE brown. Same corporate light register as the rest of the crew. Physical certainty, not aggression.
+
+**Art Bible Anchors:**
+- §1 Visual Identity: power read as calm institutional certainty, not a magazine cover — guards against the AAA hero-render failure mode
+- §5 Colour Coding: MANDATE brown (#8B5E3C) shared crew register
+
+**Generation Prompt:**
+Industrial hard science fiction character portrait, corporate security personnel file headshot, chest-up crop, slight three-quarter angle, clean even corporate lighting matching crew register, deep charcoal void background (#0A0A0C to #1E1E24), subject: man mid-twenties, physically imposing super-soldier build — tall, heavy-shouldered, thick neck, square clean-cut jaw (Jack Reacher / John Cena physicality), short regulation haircut, calm neutral controlled expression, heavy corporate combat gear with MANDATE brown collar and shoulder yoke and visible ballistic plate (#8B5E3C dominant), the crew's muscle, MANDATE register dominant, physical certainty not aggression, cassette-futurism corporate authority aesthetic, photorealistic matte oil-painting texture, even corporate light, no rim, no glamour
+
+`--no` mug shot framing, aggressive snarl, gritted teeth, combat action pose, weapons displayed, oiled-up bodybuilder, shirtless, heroic rim-lit hero shot, bright colours, purple, teal, blue, parchment warmth, fieldgrey dominant, caution amber, motion blur, fantasy, glowing elements, medals, dynamic angle, full body, beauty lighting, lens flare, bokeh
+
+**Status:** Placeholder delivered (wired to HUD)
+
+---
+
+## ASSET-036 — portrait_enemy_vanguard_tech.png (VANGUARD-3, tech)
+
+| Field | Value |
+|---|---|
+| Category | Portrait |
+| Dimensions | 96×96px |
+| Format | PNG, 32-bit RGBA, straight alpha |
+| Color profile | sRGB, no embedded ICC profile |
+| File size | ≤60 KB (typical 8–20 KB lossless) |
+| Naming | `portrait_enemy_vanguard_tech.png` |
+| Resource path | `res://assets/portraits/portrait_enemy_vanguard_tech.png` |
+| Maps to unit | `VANGUARD-3` (carries the medkit) |
+| Import preset | Standard Portrait Preset |
+| TextureRect | HUD inspect panel, `STRETCH_KEEP_ASPECT_CENTERED`, `TEXTURE_FILTER_LINEAR` |
+
+**Visual Description:**
+The crew's tech specialist — a wiry person, late twenties, lean and restless with quick alert intelligence: a tinkerer. MANDATE-brown corporate utility gear festooned with mechanical diagnostic tools, a magnifier loupe at the collar, cabling and hand-tools in chest straps — technical, not combat. Competence reads through equipment specificity. Same corporate light register as the crew.
+
+**Art Bible Anchors:**
+- §3 Shape Language: distinguishing marker is gear specificity (tools, loupe, cabling), not expression — readable role at a glance
+- §5 Colour Coding: MANDATE brown (#8B5E3C) shared crew register; tools stay matte, no glowing sci-fi elements
+
+**Generation Prompt:**
+Industrial hard science fiction character portrait, corporate security personnel file headshot, chest-up crop, slight three-quarter angle, clean even corporate lighting matching crew register, deep charcoal void background (#0A0A0C to #1E1E24), subject: wiry person late twenties, lean and restless with quick alert intelligence — a technical tinkerer, slightly jittery focused energy, short practical hair, MANDATE brown corporate utility gear (#8B5E3C dominant) festooned with mechanical diagnostic tools, a magnifier loupe clipped at the collar, cabling and small hand-tools in chest straps — technical not combat, the crew's tech specialist, MANDATE register dominant, competence through equipment specificity, cassette-futurism Alien Weyland-Yutani aesthetic, photorealistic matte oil-painting texture, even corporate light, no rim, no glamour
+
+`--no` glowing screens, glowing sci-fi UI, neon, holograms, cyberpunk neon, bright colours, purple, teal, blue, parchment warmth, fieldgrey dominant, caution amber, mug shot framing, aggressive expression, motion blur, heroic pose, fantasy, supernatural, medals, dynamic angle, full body, beauty lighting, rim light, lens flare, bokeh
+
+**Status:** Placeholder delivered (wired to HUD)
 
 ---
 
 ## Shared: Common Import Preset
 
-All 6 portraits use identical Godot import settings.
+All 8 portraits use identical Godot import settings.
 
 ```ini
 [importer = "texture"]
@@ -235,11 +316,22 @@ detect_3d/compress_to = 0
 
 ## Cross-Asset Consistency Notes
 
-**Player crew (ASSET-001–003):** All three must be lit from the same flat facility fluorescent source. Commission all three in one session pass before finalising light values — the shared light register is the crew's visual glue.
+**Player crew (ASSET-001–003):** All three lit from the same flat facility
+fluorescent source — the shared light register is the crew's visual glue.
+Register: grungy facility fluorescent, FIELDGREY-dominant.
 
-**Enemy set (ASSET-004–006):** Each portrait uses a distinct capture context implying the archetype's relationship to institutional systems:
-- SENTINEL: has been processed before (calm, experienced)
-- PRISONER: has not accepted it (tension, motion)
-- VANGUARD: processed the system itself (control, choice)
+**Vanguard rival crew (ASSET-006/035/036):** Also a crew — generate all three
+in one session sharing a register, but a *different* one from the player crew:
+clean corporate personnel lighting, MANDATE-brown dominant (they're the
+well-resourced rival company). Three distinct individuals/roles
+(leader / soldier / tech) mapping to `VANGUARD-1/2/3`. Watch-item: "super-
+soldier" prompts pull toward AAA cinematic hero renders — keep the `--no` lists
+on so power reads as calm institutional certainty, not a magazine cover.
+
+**Faceless enemy types (ASSET-004–005):** SENTINEL and PRISONER are archetype
+*types*, not individuals — one face represents all units of that kind. Each uses
+a distinct capture context implying its relationship to institutional systems:
+- SENTINEL: has been processed before (calm, experienced) — off-axis security capture, SEAM register
+- PRISONER: has not accepted it (tension, motion blur) — CAUTION amber register
 
 **Palette discipline:** No asset should introduce a hue not present in the 8 canonical colours. Skin tones are naturalistic and exempt from this rule; all fabric, background, gear, and light-source colours must map to the canonical set.

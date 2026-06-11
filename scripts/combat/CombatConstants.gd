@@ -3,12 +3,20 @@ class_name CombatConstants
 ## Shared numeric constants for all combat subsystems.
 ## All tuning knobs live here — never hardcode these values elsewhere.
 
-# Cover damage reduction
-const COVER_REDUCTION_LIGHT: int = 1
-const COVER_REDUCTION_HEAVY: int = 2
+# Cover durability (hits before a cover tile is destroyed)
 const COVER_INTEGRITY_LIGHT: int = 3
 const COVER_INTEGRITY_HEAVY: int = 6
-const COVER_REDUCTION_FRACTURED_PENALTY: int = 1
+
+# Graze tier ladder (see GrazeSystem) — deterministic hit-quality system.
+# Tier modifiers (applied from CLEAN, clamped to CHIP..CLEAN):
+const TIER_PENALTY_LIGHT_COVER: int = 1
+const TIER_PENALTY_HEAVY_COVER: int = 2
+const TIER_PENALTY_BRACE: int = 1
+const TIER_PENALTY_MAX_RANGE: int = 1
+const TIER_BONUS_ADJACENT: int = 1
+# Tier damage transforms:
+const GRAZE_DAMAGE_REDUCTION: int = 1   # GRAZE = max(1, dmg - this)
+const CHIP_DAMAGE: int = 1              # DEFLECTED always deals exactly this
 
 # AoE blast damage by zone
 const BLAST_DAMAGE_CENTER: int = 3
@@ -42,9 +50,7 @@ const SEALANT_PACK_RANGE: int = 3
 # Arc Pulse — chains SUPPRESSED to enemies within this radius of the primary target
 const ARC_PULSE_DAMAGE: int = 1
 const ARC_PULSE_CHAIN_RADIUS: int = 1
-
-# Brace — flat reduction applied to the next incoming hit while braced
-const BRACE_DAMAGE_REDUCTION: int = 2
+# Brace defence is a graze-tier downgrade — see TIER_PENALTY_BRACE above.
 
 # AI scoring thresholds
 const AI_AOE_MIN_SCORE: int = 2

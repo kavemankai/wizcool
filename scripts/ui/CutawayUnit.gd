@@ -19,10 +19,21 @@ var flash_alpha: float = 0.0:
 func setup(u: Unit) -> void:
 	unit_ref = u
 	flash_alpha = 0.0
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	queue_redraw()
 
 func _draw() -> void:
 	if not is_instance_valid(unit_ref):
+		return
+
+	# Sprite skin: draw the unit's standee at battle-scene scale (3x).
+	var standee := SpriteLib.unit_texture(unit_ref)
+	if standee != null:
+		draw_texture_rect(standee, Rect2(-72.0, -88.0, 144.0, 144.0), false)
+		if unit_ref.is_leader:
+			draw_arc(Vector2(0, -16), RADIUS + 10.0, 0.0, TAU, 40, LEADER_RING, 3.5)
+		if flash_alpha > 0.001:
+			draw_circle(Vector2.ZERO, RADIUS * 1.55, Color(1.0, 1.0, 1.0, flash_alpha))
 		return
 
 	var fill: Color

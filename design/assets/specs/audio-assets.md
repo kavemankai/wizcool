@@ -295,7 +295,7 @@ bar_beats = 4
 | Import preset | Music preset (loop = true) |
 | Trigger | Player turn start, mission entry, Terminal Hub |
 
-**Production description:** Low industrial drone — a slow, evolving foundation in the 80–200 Hz range with a slow machinery pulse (1–2 BPM rhythm, implied rather than metronomic). The texture should feel like the ambient sound of a facility that is always on, not responding to the player. No melodic content. Loop point must be inaudible — the end of the loop must dissolve back into the beginning without a click or jump. At −12 dB default bus volume, this should feel present but subconscious. Character: facility ambience, institutional patience, always-on.
+**Production description (REVISED 2026-06 — GBA chiptune direction):** Low-key chiptune loop in the GBA register — square/triangle leads over a sparse pulse bassline, mid-tempo (~90 BPM), minor key, restrained and patient rather than heroic. Reference: Fire Emblem GBA map themes, FFT prep-screen music. Loop point must be inaudible. At −12 dB default bus volume it should feel present but subconscious. Character: frontier patience, institutional work, always-on. Source: CC0/free-license pack (user-approved before download).
 
 **Loop requirements:** ~40s minimum. Loop start and end points should be embedded in the OGG metadata or marked at the Godot import level via `loop_offset`. A click or perceivable edit point at the loop boundary is a rejection criterion.
 
@@ -315,7 +315,7 @@ bar_beats = 4
 | Import preset | Music preset (loop = true) |
 | Trigger | Enemy phase start — crossfades over music_ambient_calm |
 
-**Production description:** Same drone register as music_ambient_calm — built from the same harmonic foundation. A faster pulse rhythm (8–16 BPM, more metronomic than the calm layer) plus a higher-pitch sustained layer (~400–600 Hz, thin and slightly unstable) added on top. When crossfaded over the calm track, the result should feel like the same space with the tension rising — not a different piece of music. Same loop length as music_ambient_calm is strongly preferred so that crossfades can align to a consistent loop boundary. Character: same-world escalation, mechanical threat, not dramatic.
+**Production description (REVISED 2026-06 — GBA chiptune direction):** Same chiptune register as music_ambient_calm but escalated — faster pulse rhythm, driving bassline, tighter percussion, minor-key tension. Reference: Fire Emblem GBA enemy-phase themes. When crossfaded over the calm track the result should read as the same world under pressure, not a different piece of music. Same loop length as calm strongly preferred for phase-aligned crossfades. Character: enemy-phase escalation, mechanical threat, not dramatic. Source: CC0/free-license pack (user-approved before download).
 
 **Crossfade note:** Godot crossfade between calm and tension is implemented by playing both `AudioStreamPlayer` nodes simultaneously, fading out calm while fading in tension over a short window (~0.5–1s). Both loops must be running continuously (calm at full volume during player turn, tension at 0; swap on enemy phase start). Same loop length ensures they stay phase-aligned across multiple turns.
 
