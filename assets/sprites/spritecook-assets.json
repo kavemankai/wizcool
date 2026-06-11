@@ -1,0 +1,18 @@
+[
+  { "asset_id": "b9e3335c-0852-4899-b00a-c0693fc9a03e", "label": "unit_alpha standee (style anchor, nano-banana-2)", "file": "units/unit_alpha.png" },
+  { "asset_id": "2a110a68-10c1-416c-ac1f-5f7ec07eb264", "label": "unit_bravo standee (gpt-image-2 low)", "file": "units/unit_bravo.png" },
+  { "asset_id": "4c1ef723-1413-45f5-ac11-55e632b54002", "label": "unit_charlie standee", "file": "units/unit_charlie.png" },
+  { "asset_id": "81fef739-2751-4520-96ec-47becb35b2bc", "label": "unit_vanguard_leader standee", "file": "units/unit_vanguard_leader.png" },
+  { "asset_id": "fec776e0-d085-4624-bd22-31d263847fd0", "label": "unit_vanguard_soldier standee", "file": "units/unit_vanguard_soldier.png" },
+  { "asset_id": "0851eb95-0986-4d89-b2e1-6b6792c5e1b0", "label": "unit_vanguard_tech standee", "file": "units/unit_vanguard_tech.png" },
+  { "asset_id": "92d8b870-be0e-42e0-82de-1316a822cb6b", "label": "unit_sentinel standee (faceless type)", "file": "units/unit_sentinel.png" },
+  { "asset_id": "b259cdde-9113-4159-bc4c-1cb4b2136970", "label": "unit_prisoner standee (faceless type)", "file": "units/unit_prisoner.png" },
+  { "asset_id": "3d4007ef-3f81-41e4-8924-250ad5f5e8c8", "label": "tile_floor_0 (tile style anchor, nano-banana-2)", "file": "tiles/tile_floor_0.png" },
+  { "asset_id": "ca24a1d3-3ac5-43e1-89bd-55e68a2d401d", "label": "tile_floor_1", "file": "tiles/tile_floor_1.png" },
+  { "asset_id": "18493d47-bd49-4d73-a5da-599c2971891b", "label": "tile_floor_2", "file": "tiles/tile_floor_2.png" },
+  { "asset_id": "e0e4fa23-e8e5-434b-afa5-7701bae73f13", "label": "tile_wall", "file": "tiles/tile_wall.png" },
+  { "asset_id": "4ccbc6cc-6288-4f90-a0b0-cc4110b0dd56", "label": "tile_cover", "file": "tiles/tile_cover.png" },
+  { "asset_id": "9573475b-acf6-4f54-b52f-65d4b0403baa", "label": "tile_hazard", "file": "tiles/tile_hazard.png" },
+  { "asset_id": "a8db374a-bcf6-42f5-9005-68c5b9a36e62", "label": "cutaway_bg_player 640x720 (nano-banana-2)", "file": "cutaway/cutaway_bg_player.png" },
+  { "asset_id": "f5764d71-29f2-450b-a634-11d606aef05d", "label": "cutaway_bg_enemy 640x720 (gpt-image-2 low)", "file": "cutaway/cutaway_bg_enemy.png" }
+]
