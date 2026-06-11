@@ -324,9 +324,10 @@ func _build_ui() -> void:
 	ovr.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(ovr)
 
-	# Panel backgrounds (tall — cover text zone + sprite zone)
-	_bg_rect(root, Vector2(60, 55), Vector2(510, 600))
-	_bg_rect(root, Vector2(710, 55), Vector2(510, 600))
+	# Panel backgrounds (tall — cover text zone + sprite zone). Painted
+	# side-backgrounds when the art exists; flat panels otherwise.
+	_panel_bg(root, Vector2(60, 55), Vector2(510, 600), true)
+	_panel_bg(root, Vector2(710, 55), Vector2(510, 600), false)
 
 	# === TEXT ZONE (top ~200px of each panel) ===
 
@@ -417,3 +418,18 @@ func _bg_rect(parent: Control, pos: Vector2, sz: Vector2,
 	r.color = col
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(r)
+
+## Side panel background: painted scene art when present, flat panel otherwise.
+func _panel_bg(parent: Control, pos: Vector2, sz: Vector2, player_side: bool) -> void:
+	var tex := SpriteLib.cutaway_bg(player_side)
+	if tex == null:
+		_bg_rect(parent, pos, sz)
+		return
+	var tr := TextureRect.new()
+	tr.position = pos
+	tr.size = sz
+	tr.texture = tex
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(tr)

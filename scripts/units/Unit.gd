@@ -65,8 +65,22 @@ var cover_integrity: int = 0                        # remaining hits before cove
 var cover_type: CoverSystem.CoverType = CoverSystem.CoverType.NONE
 var status_effects: StatusEffectManager
 
+# Standee idle bob (sprite skin only): toggles a 1px vertical offset.
+var _bob_up: bool = false
+
 func _ready() -> void:
 	status_effects = StatusEffectManager.new()
+	# Crisp 2:1 downsample for the sprite skin (64px sources into 32px tiles).
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	if SpriteLib.unit_texture(self) != null:
+		var bob := Timer.new()
+		bob.wait_time = 0.6
+		bob.autostart = true
+		bob.timeout.connect(func() -> void:
+			_bob_up = not _bob_up
+			if not is_downed:
+				queue_redraw())
+		add_child(bob)
 
 func get_effective_combat_skill() -> int:
 	var total := combat_skill
@@ -202,45 +216,22 @@ func contains_point(world_point: Vector2) -> bool:
 	return global_position.distance_to(world_point) <= RADIUS + 6.0
 
 func _draw() -> void:
+	var standee := SpriteLib.unit_texture(self)
+
 	if is_downed:
-		draw_circle(Vector2.ZERO, RADIUS, Color(0.28, 0.28, 0.28, 0.4))
+		if standee != null:
+			_draw_standee(standee, Color(0.35, 0.35, 0.35, 0.5))
+		else:
+			draw_circle(Vector2.ZERO, RADIUS, Color(0.28, 0.28, 0.28, 0.4))
 		return
 
-	var fill: Color
-	if is_player:
-		fill = PLAYER_COLOR
+	if standee != null:
+		var tint := Color.WHITE
+		if has_moved and has_attacked:
+			tint = Color(0.55, 0.55, 0.55)  # spent units grey out, FE-style
+		_draw_standee(standee, tint)
 	else:
-		match archetype:
-			Archetype.GUARDIAN:  fill = GUARDIAN_COLOR
-			Archetype.RAMPAGING: fill = RAMPAGING_COLOR
-			Archetype.TACTICAL:  fill = TACTICAL_COLOR
-			_:                   fill = GUARDIAN_COLOR
-
-	if has_moved and has_attacked:
-		fill = fill.lerp(Color(0.3, 0.3, 0.3), 0.45)
-
-	draw_circle(Vector2.ZERO, RADIUS, fill)
-
-	# Player crew show their callsign initial (A/B/C) inside the sprite.
-	if is_player and not unit_id.is_empty():
-		var font: Font = ThemeDB.fallback_font
-		var ch := unit_id.substr(0, 1)
-		var fsize := 11
-		var sz := font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize)
-		var baseline := (font.get_ascent(fsize) - font.get_descent(fsize)) * 0.5
-		draw_string(font, Vector2(-sz.x * 0.5, baseline), ch,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, fsize, Color(0.96, 0.96, 0.98))
-
-	if not is_player:
-		match archetype:
-			Archetype.RAMPAGING:
-				draw_line(Vector2(-4, 0), Vector2(4, 0), Color(1, 1, 1, 0.5), 1.5)
-				draw_line(Vector2(0, -4), Vector2(0, 4), Color(1, 1, 1, 0.5), 1.5)
-			Archetype.TACTICAL:
-				draw_line(Vector2(0, -5), Vector2(4, 0), Color(1, 1, 1, 0.5), 1.2)
-				draw_line(Vector2(4, 0), Vector2(0, 5),  Color(1, 1, 1, 0.5), 1.2)
-				draw_line(Vector2(0, 5), Vector2(-4, 0), Color(1, 1, 1, 0.5), 1.2)
-				draw_line(Vector2(-4, 0), Vector2(0, -5),Color(1, 1, 1, 0.5), 1.2)
+		_draw_fallback_disc()
 
 	if is_leader:
 		draw_arc(Vector2.ZERO, RADIUS + 3.5, 0.0, TAU, 32, LEADER_RING, 1.5)
@@ -274,3 +265,53 @@ func _draw() -> void:
 		elif item.state == GearItem.GearState.BROKEN:
 			draw_rect(Rect2(notch_x, notch_y, 4.0, 4.0), Color(0.25, 0.12, 0.12))
 			notch_y += 6.0
+
+## GBA-style 48x48 standee, feet anchored near the tile bottom so the body
+## overflows the 32px tile upward (Fire Emblem map-sprite convention).
+## Mirrored horizontally when facing left; idle bob is a 1px offset.
+func _draw_standee(tex: Texture2D, tint: Color) -> void:
+	var bob := -1.0 if (_bob_up and not is_downed) else 0.0
+	var flip := facing.x < 0
+	if flip:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1.0, 1.0))
+	draw_texture_rect(tex, Rect2(-24.0, -34.0 + bob, 48.0, 48.0), false, tint)
+	if flip:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+## Original programmatic disc — used whenever no standee texture exists.
+func _draw_fallback_disc() -> void:
+	var fill: Color
+	if is_player:
+		fill = PLAYER_COLOR
+	else:
+		match archetype:
+			Archetype.GUARDIAN:  fill = GUARDIAN_COLOR
+			Archetype.RAMPAGING: fill = RAMPAGING_COLOR
+			Archetype.TACTICAL:  fill = TACTICAL_COLOR
+			_:                   fill = GUARDIAN_COLOR
+
+	if has_moved and has_attacked:
+		fill = fill.lerp(Color(0.3, 0.3, 0.3), 0.45)
+
+	draw_circle(Vector2.ZERO, RADIUS, fill)
+
+	# Player crew show their callsign initial (A/B/C) inside the disc.
+	if is_player and not unit_id.is_empty():
+		var font: Font = ThemeDB.fallback_font
+		var ch := unit_id.substr(0, 1)
+		var fsize := 11
+		var sz := font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize)
+		var baseline := (font.get_ascent(fsize) - font.get_descent(fsize)) * 0.5
+		draw_string(font, Vector2(-sz.x * 0.5, baseline), ch,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, fsize, Color(0.96, 0.96, 0.98))
+
+	if not is_player:
+		match archetype:
+			Archetype.RAMPAGING:
+				draw_line(Vector2(-4, 0), Vector2(4, 0), Color(1, 1, 1, 0.5), 1.5)
+				draw_line(Vector2(0, -4), Vector2(0, 4), Color(1, 1, 1, 0.5), 1.5)
+			Archetype.TACTICAL:
+				draw_line(Vector2(0, -5), Vector2(4, 0), Color(1, 1, 1, 0.5), 1.2)
+				draw_line(Vector2(4, 0), Vector2(0, 5),  Color(1, 1, 1, 0.5), 1.2)
+				draw_line(Vector2(0, 5), Vector2(-4, 0), Color(1, 1, 1, 0.5), 1.2)
+				draw_line(Vector2(-4, 0), Vector2(0, -5),Color(1, 1, 1, 0.5), 1.2)
