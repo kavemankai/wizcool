@@ -86,11 +86,11 @@ func play_pending() -> void:
 	if not _playing:
 		return
 	_play_attack_animation()
-	await get_tree().create_timer(0.85).timeout
+	await get_tree().create_timer(0.85, false).timeout
 	if not _playing:
 		return
 	_update_tgh_label()
-	get_tree().create_timer(2.0).timeout.connect(_finish, CONNECT_ONE_SHOT)
+	get_tree().create_timer(2.0, false).timeout.connect(_finish, CONNECT_ONE_SHOT)
 	await cutaway_dismissed
 
 # ---------------------------------------------------------------------------

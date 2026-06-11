@@ -49,4 +49,10 @@ func _row(parent: Control, text: String) -> void:
 	parent.add_child(lbl)
 
 func _on_begin() -> void:
+	AudioManager.play_sfx("ui_click")
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
+
+## Android back button → return to the hub without starting the mission.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		get_tree().change_scene_to_file("res://scenes/ui/TerminalHub.tscn")

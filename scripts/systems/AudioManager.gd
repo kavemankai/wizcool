@@ -47,6 +47,24 @@ const _UI_BUS_SLOTS: Array[String] = [
 func _ready() -> void:
 	_build_sfx_players()
 	_build_music_players()
+	apply_volumes()
+
+## Apply GameState volume settings (linear 0..1) to the audio buses.
+## Called at startup and live from the settings menu sliders.
+func apply_volumes() -> void:
+	_set_bus_linear("SFX", GameState.sfx_volume)
+	_set_bus_linear("Music", GameState.music_volume)
+	_set_bus_linear("UI", GameState.ui_volume)
+
+func _set_bus_linear(bus_name: String, linear: float) -> void:
+	var idx := AudioServer.get_bus_index(bus_name)
+	if idx < 0:
+		return
+	if linear <= 0.001:
+		AudioServer.set_bus_mute(idx, true)
+	else:
+		AudioServer.set_bus_mute(idx, false)
+		AudioServer.set_bus_volume_db(idx, linear_to_db(linear))
 
 func _build_sfx_players() -> void:
 	for slot: String in _SFX_BUS_SLOTS:

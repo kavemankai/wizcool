@@ -2,10 +2,10 @@ class_name HUD
 extends CanvasLayer
 
 signal end_turn_pressed
+signal pause_pressed
 signal field_patch_pressed
 signal skip_pressed
 signal ability_pressed
-signal cutaway_toggled(enabled: bool)
 signal debug_toggled(enabled: bool)
 
 # Fewer, larger log lines so the combat log stays readable on a phone.
@@ -74,9 +74,7 @@ var _end_turn_btn: Button
 var _field_patch_btn: Button
 var _skip_btn: Button
 var _ability_btn: Button
-var _cutaway_btn: Button
 var _debug_btn: Button
-var _cutaway_on: bool = true
 var _debug_on: bool = false
 var _precision_label: Label
 var _aoe_label: Label
@@ -221,16 +219,19 @@ func _ready() -> void:
 		ability_pressed.emit())
 	root.add_child(_ability_btn)
 
+	# --- Top-left: PAUSE (under the mission title, away from grid taps) -----
+	var pause_btn := _settings_button(root, Rect2(MARGIN, 44, 150, 56), "❚❚ PAUSE")
+	pause_btn.add_theme_font_size_override("font_size", 20)
+	pause_btn.pressed.connect(func() -> void:
+		AudioManager.play_sfx("ui_click")
+		pause_pressed.emit())
+
 	# --- Top-right corner: secondary settings (small, out of thumb zone) ----
 	# CUTAWAY and DEBUG are settings, not per-turn actions, so they sit small
 	# in the corner and never compete with END TURN / USE ABILITY.
 	var set_x := SCREEN_W - MARGIN - SET_BTN_W
-	_cutaway_btn = _settings_button(root, Rect2(set_x, MARGIN, SET_BTN_W, SET_BTN_H),
-			"CUTAWAY: ON")
-	_cutaway_btn.pressed.connect(_on_cutaway_btn_pressed)
-
-	_debug_btn = _settings_button(root,
-			Rect2(set_x, MARGIN + SET_BTN_H + 8, SET_BTN_W, SET_BTN_H), "DEBUG: OFF")
+	_debug_btn = _settings_button(root, Rect2(set_x, MARGIN, SET_BTN_W, SET_BTN_H),
+			"DEBUG: OFF")
 	_debug_btn.visible = GameState.DEBUG_MODE
 	_debug_btn.pressed.connect(_on_debug_btn_pressed)
 
@@ -345,11 +346,6 @@ func set_ability_visible(show_btn: bool, label: String = "") -> void:
 	_ability_btn.visible = show_btn
 	if show_btn and label != "":
 		_ability_btn.text = label
-
-func _on_cutaway_btn_pressed() -> void:
-	_cutaway_on = not _cutaway_on
-	_cutaway_btn.text = "CUTAWAY: ON" if _cutaway_on else "CUTAWAY: OFF"
-	cutaway_toggled.emit(_cutaway_on)
 
 func _on_debug_btn_pressed() -> void:
 	_debug_on = not _debug_on

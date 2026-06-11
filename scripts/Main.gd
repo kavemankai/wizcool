@@ -21,7 +21,6 @@ var dropped_loot: Array[GearItem] = []
 var rival_rank: int = 1
 var hazard_manager: HazardSystem = null
 var _skip_requested: bool = false
-var _show_cutaway: bool = true
 var _debug_mode: bool = false
 
 # Two-tap attack confirm: first tap on an enemy previews the graze tier,
@@ -42,7 +41,14 @@ var _gear_archive: Dictionary = {}
 @onready var hud: HUD = $HUD
 @onready var cutaway: CombatCutaway = $CombatCutaway
 
+var pause_menu: PauseMenu
+
 func _ready() -> void:
+	pause_menu = PauseMenu.new()
+	add_child(pause_menu)
+	pause_menu.resume_pressed.connect(func() -> void: _set_paused(false))
+	pause_menu.abandon_pressed.connect(_on_pause_abandon)
+	hud.pause_pressed.connect(func() -> void: _set_paused(true))
 	var grid_w := GridManager.GRID_WIDTH * GridManager.TILE_SIZE
 	var grid_h := GridManager.GRID_HEIGHT * GridManager.TILE_SIZE
 	var vp := get_viewport_rect().size
@@ -54,7 +60,6 @@ func _ready() -> void:
 	hud.field_patch_pressed.connect(_on_field_patch)
 	hud.skip_pressed.connect(func() -> void: _skip_requested = true)
 	hud.ability_pressed.connect(_on_ability_pressed)
-	hud.cutaway_toggled.connect(func(on: bool) -> void: _show_cutaway = on)
 	hud.debug_toggled.connect(func(on: bool) -> void: _debug_mode = on)
 
 	var gs := GameState
@@ -266,6 +271,20 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_handle_click(event.global_position)
+
+## Android back button → pause menu toggle (ignored once the mission ends).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST and game_phase != GamePhase.GAME_OVER:
+		_set_paused(not get_tree().paused)
+
+func _set_paused(paused: bool) -> void:
+	get_tree().paused = paused
+	pause_menu.visible = paused
+
+func _on_pause_abandon() -> void:
+	_set_paused(false)
+	hud.log("=== MISSION ABANDONED ===")
+	_on_mission_fail("MISSION ABANDONED")
 
 func _handle_click(click_pos: Vector2) -> void:
 	var clicked_unit: Unit = _unit_at_screen(click_pos)
@@ -514,7 +533,7 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 		Unit.DamageResult.DOWNED:
 			hud.log("%s → %s  -%d TGH — DOWNED" % [
 				attacker.unit_id, target.unit_id, dmg])
-	if _show_cutaway:
+	if GameState.show_cutaway:
 		cutaway.queue_event(attacker, target, dmg, result, pre_tgh, tier)
 		await cutaway.play_pending()
 	if target.is_downed:
@@ -719,7 +738,7 @@ func _run_enemy_phase() -> void:
 		if not is_instance_valid(enemy) or enemy.is_downed:
 			continue
 
-		await get_tree().create_timer(0.0 if _skip_requested else 0.8).timeout
+		await get_tree().create_timer(0.0 if _skip_requested else 0.8, false).timeout
 
 		if game_phase == GamePhase.GAME_OVER:
 			break
@@ -731,7 +750,7 @@ func _run_enemy_phase() -> void:
 		enemy.queue_redraw()
 		hud.show_unit(enemy)
 
-		var cq: Object = null if (_skip_requested or not _show_cutaway) else cutaway
+		var cq: Object = null if (_skip_requested or not GameState.show_cutaway) else cutaway
 		var lines: Array[String] = []
 		match enemy.archetype:
 			Unit.Archetype.GUARDIAN:
@@ -747,7 +766,7 @@ func _run_enemy_phase() -> void:
 			enemy.is_acting = false
 			enemy.queue_redraw()
 
-		if not _skip_requested and _show_cutaway and cutaway.has_pending():
+		if not _skip_requested and GameState.show_cutaway and cutaway.has_pending():
 			await cutaway.play_pending()
 		elif cutaway.has_pending():
 			cutaway.clear_pending()
@@ -797,7 +816,7 @@ func _run_enemy_phase() -> void:
 		if game_phase == GamePhase.GAME_OVER:
 			return
 
-	await get_tree().create_timer(0.0 if skip_was_requested else 0.4).timeout
+	await get_tree().create_timer(0.0 if skip_was_requested else 0.4, false).timeout
 
 	round_number += 1
 
@@ -929,7 +948,7 @@ func _on_mission_success() -> void:
 		"campaign_complete": campaign_complete,
 	}
 	sm.save()
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(1.5, false).timeout
 	get_tree().change_scene_to_file("res://scenes/ui/PostMissionScreen.tscn")
 
 func _on_mission_fail(reason: String) -> void:
@@ -950,7 +969,7 @@ func _on_mission_fail(reason: String) -> void:
 		"campaign_complete": false,
 	}
 	sm.save()
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(1.5, false).timeout
 	get_tree().change_scene_to_file("res://scenes/ui/PostMissionScreen.tscn")
 
 # ---------------------------------------------------------------------------

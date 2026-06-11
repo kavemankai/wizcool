@@ -1,10 +1,50 @@
 extends Node
 
 const SAVE_PATH := "user://fringe_ledger_save.json"
+const SETTINGS_PATH := "user://settings.cfg"
 const STARTING_CREDITS := 200
 
 func _ready() -> void:
 	load_save()
+	load_settings()
+
+## True when a campaign save exists on disk (drives the title CONTINUE button).
+func has_save() -> bool:
+	return FileAccess.file_exists(SAVE_PATH)
+
+## Delete the campaign save and reset run state (title NEW JOB).
+func delete_save() -> void:
+	if FileAccess.file_exists(SAVE_PATH):
+		DirAccess.remove_absolute(SAVE_PATH)
+	var gs := GameState
+	gs.credits = STARTING_CREDITS
+	gs.vanguard_rank = 1
+	gs.crew = []
+	gs.pending_loot = []
+	gs.last_mission_result = {}
+	gs.current_mission_index = 0
+	gs.campaigns_completed = 0
+
+## Persist player settings (volumes, cutaway toggle) to a ConfigFile —
+## deliberately separate from the campaign save.
+func save_settings() -> void:
+	var cfg := ConfigFile.new()
+	var gs := GameState
+	cfg.set_value("audio", "sfx_volume", gs.sfx_volume)
+	cfg.set_value("audio", "music_volume", gs.music_volume)
+	cfg.set_value("audio", "ui_volume", gs.ui_volume)
+	cfg.set_value("gameplay", "show_cutaway", gs.show_cutaway)
+	cfg.save(SETTINGS_PATH)
+
+func load_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(SETTINGS_PATH) != OK:
+		return
+	var gs := GameState
+	gs.sfx_volume = clampf(cfg.get_value("audio", "sfx_volume", gs.sfx_volume), 0.0, 1.0)
+	gs.music_volume = clampf(cfg.get_value("audio", "music_volume", gs.music_volume), 0.0, 1.0)
+	gs.ui_volume = clampf(cfg.get_value("audio", "ui_volume", gs.ui_volume), 0.0, 1.0)
+	gs.show_cutaway = cfg.get_value("gameplay", "show_cutaway", gs.show_cutaway)
 
 func save() -> void:
 	var gs := GameState
